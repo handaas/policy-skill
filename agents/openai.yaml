@@ -1,0 +1,4 @@
+interface:
+  display_name: "政策大数据报告"
+  short_description: "基于 HandaaS 政策大数据 MCP，按政策关键词生成立项项目统计 / 政策检索明细 / 政策详情的专业 HTML / Markdown / JSON 报告。"
+  default_prompt: "使用 $policy-report 生成「政策关键词」的政策大数据报告：可选企业全称启用立项统计，调用政策 MCP 工具，产出 HTML + Markdown + JSON 三件套。"
