@@ -19,10 +19,9 @@ import argparse
 import datetime as dt
 import json
 import pathlib
-import sys
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Dict, List, Mapping, Optional, Sequence
 
-from common import REPORT_BANNER, REPORT_TYPE, json_dumps, load_json_file, print_json
+from common import REPORT_BANNER, REPORT_TYPE, attach_pagination, call_tool_once, collect_detail_pages, die, json_dumps, load_json_file, paid_call_scope, print_json
 import mcp_client
 from render_report import render_html, render_markdown, html_to_pdf
 
@@ -47,6 +46,8 @@ def _is_api_error(value: Any) -> bool:
     if isinstance(value, str):
         return any(s in value for s in ("接口调用失败", "查询失败", "状态码：4", "状态码：5"))
     if isinstance(value, dict):
+        if value.get("_mcp_error") or value.get("_error") or value.get("isError") is True or value.get("error"):
+            return True
         for v in value.values():
             if isinstance(v, str) and any(s in v for s in ("接口调用失败", "查询失败", "状态码：4", "状态码：5")):
                 return True
@@ -58,12 +59,14 @@ def _first_list(value: Any) -> List[Any]:
     if isinstance(value, dict):
         if _is_api_error(value):
             return []
+        if set(value) <= {"text", "error", "code", "_error", "_mcp_error"}:
+            return []
         for key in ("resultList", "list", "items", "data"):
             if isinstance(value.get(key), list):
                 return value[key]
     if value in (None, "", {}):
         return []
-    return [value]
+    return []
 
 
 def _first_record(value: Any) -> Dict[str, Any]:
@@ -150,7 +153,7 @@ def _int(value: Any) -> Optional[int]:
 
 def _safe_call(tool: str, arguments: Dict[str, Any]) -> Any:
     try:
-        result = mcp_client.call_tool(tool, arguments)
+        result = call_tool_once(mcp_client.call_tool, tool, arguments)
         # Detect API error responses (405, etc.) and return error marker
         if _is_api_error(result):
             return {"_error": "API错误", "_raw": result}
@@ -165,6 +168,18 @@ def _safe_total(payload: Any) -> Any:
             return None
         return payload.get("total")
     return None
+
+
+def _payload_status(payload: Any) -> str:
+    if _is_api_error(payload):
+        return "error"
+    if isinstance(payload, dict) and str(payload.get("text") or "").strip() == "查询数据为空":
+        return "empty"
+    if _first_list(payload) or _safe_total(payload) is not None:
+        return "success" if (_first_list(payload) or _safe_total(payload) not in (0, "0")) else "empty"
+    if isinstance(payload, dict) and payload:
+        return "success"
+    return "empty"
 
 
 # --------------------------------------------------------------------------- #
@@ -184,6 +199,15 @@ def resolve_enterprise_name(raw: str) -> Dict[str, Any]:
     if any(suffix in raw for suffix in ("公司", "集团", "有限", "院", "厂", "中心", "事务所", "合作社", "合伙")):
         return {"keyword": raw, "enterprise": raw, "resolved": True, "reason": "视为企业全称"}
     fuzzy = _safe_call(T_FUZZY, {"matchKeyword": raw, "pageSize": 1})
+    fuzzy_total = _int(_safe_total(fuzzy))
+    if fuzzy_total is not None and fuzzy_total > 1:
+        return {
+            "keyword": raw,
+            "enterprise": raw,
+            "resolved": False,
+            "reason": f"模糊查询返回多候选（{fuzzy_total}），未静默选择首条",
+            "fuzzy_total": fuzzy_total,
+        }
     record = _first_record(fuzzy)
     name = str(record.get("name") or "").strip()
     if name:
@@ -264,7 +288,10 @@ def _derive_core_metrics(metrics: List[Dict[str, Any]], core: Mapping[str, Any])
     if isinstance(monthly, list) and monthly:
         metrics.append({"label": "覆盖月份", "value": str(len(monthly)), "hint": "有政策发布的月份数"})
     if isinstance(search, list) and search:
-        agencies = set(str(r.get("发布机构", "")) for r in search if r.get("发布机构"))
+        agencies = set(
+            str(r.get("发布机构", "")) for r in search
+            if r.get("发布机构") and r.get("相关性") == "标题确认" and r.get("重复标记") != "重复样本"
+        )
         if agencies:
             metrics.append({"label": "发布机构数", "value": str(len(agencies)), "hint": "涉及的政策发布机构数"})
     return metrics
@@ -275,12 +302,16 @@ def _derive_core_metrics(metrics: List[Dict[str, Any]], core: Mapping[str, Any])
 # --------------------------------------------------------------------------- #
 
 def build_subject(keyword: str, enterprise_resolved: Mapping[str, Any], filters: Mapping[str, Any]) -> Dict[str, Any]:
+    enterprise_input = str(filters.get("enterprise") or "")
+    resolved = bool(enterprise_resolved.get("resolved"))
     return {
         "keyword": keyword,
         "matchKeyword": keyword,
-        "enterprise": enterprise_resolved.get("enterprise") or "",
-        "enterprise_resolved": bool(enterprise_resolved.get("resolved")),
+        "enterprise": (enterprise_resolved.get("enterprise") or "") if resolved else "",
+        "enterprise_input": enterprise_input,
+        "enterprise_resolved": resolved,
         "enterprise_resolve_reason": enterprise_resolved.get("reason", ""),
+        "enterprise_blocked_reason": (enterprise_resolved.get("reason", "") if enterprise_input and not resolved else ""),
         "pn_type": filters.get("pn_type") or "全部",
         "agency": filters.get("agency") or "",
         "address": filters.get("address") or "",
@@ -288,19 +319,33 @@ def build_subject(keyword: str, enterprise_resolved: Mapping[str, Any], filters:
     }
 
 
+def _approved_level_values(approved: Mapping[str, Any]) -> Dict[str, Any]:
+    """Read all four project levels from the real nested ppeLevelStat shape.
+
+    Older samples may expose national/provincial at the top level, so those are
+    retained only as a compatibility fallback when the nested value is absent.
+    """
+    level_value = approved.get("ppeLevelStat")
+    level = level_value if isinstance(level_value, dict) else {}
+    return {
+        key: level.get(key) if level.get(key) is not None else approved.get(key)
+        for key in (
+            "nationalProjectCount",
+            "provincialProjectCount",
+            "municipalProjectCount",
+            "districtProjectCount",
+        )
+    }
+
+
 def build_metrics(approved: Mapping[str, Any], search_total: Any) -> List[Dict[str, Any]]:
     metrics: List[Dict[str, Any]] = []
     a = approved if isinstance(approved, dict) else {}
     if a:
+        level = _approved_level_values(a)
         # Compute total for level-share deltas.
         total_proj = 0.0
-        for k in ("nationalProjectCount", "provincialProjectCount"):
-            try:
-                total_proj += float(a.get(k) or 0)
-            except (TypeError, ValueError):
-                pass
-        level = a.get("ppeLevelStat") if isinstance(a.get("ppeLevelStat"), dict) else {}
-        for k in ("municipalProjectCount", "districtProjectCount"):
+        for k in ("nationalProjectCount", "provincialProjectCount", "municipalProjectCount", "districtProjectCount"):
             try:
                 total_proj += float(level.get(k) or 0)
             except (TypeError, ValueError):
@@ -316,11 +361,11 @@ def build_metrics(approved: Mapping[str, Any], search_total: Any) -> List[Dict[s
                 pass
             return d
 
-        m1: Dict[str, Any] = {"label": "国家级项目", "value": _text(a.get("nationalProjectCount")) or "-", "hint": "获批国家级项目数量"}
-        m1.update(_share_delta(a.get("nationalProjectCount")))
+        m1: Dict[str, Any] = {"label": "国家级项目", "value": _text(level.get("nationalProjectCount")) or "-", "hint": "获批国家级项目数量"}
+        m1.update(_share_delta(level.get("nationalProjectCount")))
         metrics.append(m1)
-        m2: Dict[str, Any] = {"label": "省级项目", "value": _text(a.get("provincialProjectCount")) or "-", "hint": "获批省级项目数量"}
-        m2.update(_share_delta(a.get("provincialProjectCount")))
+        m2: Dict[str, Any] = {"label": "省级项目", "value": _text(level.get("provincialProjectCount")) or "-", "hint": "获批省级项目数量"}
+        m2.update(_share_delta(level.get("provincialProjectCount")))
         metrics.append(m2)
         if level:
             m3: Dict[str, Any] = {"label": "市级项目", "value": _text(level.get("municipalProjectCount")) or "-", "hint": "获批市级项目数量"}
@@ -337,13 +382,30 @@ def build_caliber(subject: Mapping[str, Any]) -> Dict[str, Any]:
     parts = ["政策检索按政策关键词匹配", f"（pnType={subject.get('pn_type', '全部')}）"]
     if subject.get("enterprise"):
         parts.append(f"；立项项目统计按企业主体“{subject.get('enterprise')}”匹配")
+    products = [item["name"] for item in _requested_product_rows(subject)]
+    limit = "数据来自政策公开数据库；少量字段可能存在更新延迟。"
+    if subject.get("enterprise_blocked_reason"):
+        limit += f" 企业主体未唯一解析（{subject.get('enterprise_blocked_reason')}），未执行企业立项统计；政策关键词检索仍为独立范围。"
     return {
         "match_target": f"政策关键词“{subject.get('keyword')}”" + (f" / 企业“{subject.get('enterprise')}”" if subject.get("enterprise") else ""),
         "match_type": "".join(parts),
-        "data_scope": "立项项目统计、政策检索明细、政策详情",
-        "products": ["政策检索", "立项项目统计", "政策详情"],
-        "limit": "数据来自政策公开数据库；少量字段可能存在更新延迟。",
+        "data_scope": "、".join("政策检索明细" if item == "政策检索" else item for item in products),
+        "products": products,
+        "limit": limit,
     }
+
+
+def _requested_product_rows(subject: Mapping[str, Any]) -> List[Dict[str, str]]:
+    """List only products whose tools were requested for this report."""
+    rows = [{"name": "政策检索", "product_id": "66c702b725f04ab44cd24ceb"}]
+    reason = str(subject.get("enterprise_resolve_reason") or "")
+    if subject.get("enterprise_input") and reason and reason not in ("视为企业全称", "未提供企业主体"):
+        rows.append({"name": "企业模糊查询", "product_id": "675cea1f0e009a9ea37edaa1"})
+    if subject.get("enterprise"):
+        rows.append({"name": "立项项目统计", "product_id": "66c702b725f04ab44cd24c9c"})
+    if subject.get("policy_id"):
+        rows.append({"name": "政策详情", "product_id": "66c702b725f04ab44cd24cd6"})
+    return rows
 
 
 def build_core_analysis(approved: Any, search: Any, policy_info: Any, subject: Mapping[str, Any]) -> Dict[str, Any]:
@@ -352,23 +414,17 @@ def build_core_analysis(approved: Any, search: Any, policy_info: Any, subject: M
     # 立项项目统计 KV + 表
     approved_kv: Dict[str, Any] = {}
     if a:
+        level = _approved_level_values(a)
         for k, label in (
             ("nationalProjectCount", "国家级项目数"),
             ("provincialProjectCount", "省级项目数"),
-        ):
-            if a.get(k) is not None:
-                approved_kv[label] = _text(a.get(k))
-        level = a.get("ppeLevelStat") if isinstance(a.get("ppeLevelStat"), dict) else {}
-        for k, label in (
             ("municipalProjectCount", "市级项目数"),
             ("districtProjectCount", "区级项目数"),
         ):
             if level.get(k) is not None:
                 approved_kv[label] = _text(level.get(k))
-    if subject.get("enterprise"):
+    if subject.get("enterprise") and approved_kv:
         approved_kv.setdefault("匹配企业", subject.get("enterprise"))
-    elif not approved_kv:
-        approved_kv["说明"] = "未提供企业主体，立项项目统计为空；可用 --enterprise 补充企业全称以启用该项目统计。"
 
     agency_rows = []
     for item in _first_list(a.get("ppeAgencyStat")):
@@ -387,20 +443,36 @@ def build_core_analysis(approved: Any, search: Any, policy_info: Any, subject: M
             "获批项目数": _text(item.get("count")) or "-",
         })
 
-    # 政策检索明细表
+    # 政策检索明细：逐条做本地关键词证据标注，并按稳定字段标记重复。
     search_rows = []
+    title_confirmed_unique_items: List[Dict[str, Any]] = []
+    seen_keys = set()
+    keyword = _text(subject.get("keyword")).strip().lower()
     total = None
     if isinstance(search, dict):
         total = search.get("total")
     for item in _first_list(search):
         if not isinstance(item, dict):
             continue
+        title = _text(item.get("pnTitle"))
+        body = _text(item.get("pnText"))
+        title_hit = bool(keyword and keyword in title.lower())
+        body_hit = bool(keyword and keyword in body.lower())
+        stable_key = (title, _text(item.get("pnAgency")), _text(item.get("pnPublishDate")))
+        duplicate = stable_key in seen_keys
+        seen_keys.add(stable_key)
+        if title_hit and not duplicate:
+            title_confirmed_unique_items.append(item)
+        relevance = "标题确认" if title_hit else "正文线索" if body_hit else "未命中"
         search_rows.append({
-            "政策标题": _text(item.get("pnTitle")) or "-",
+            "政策标题": title or "-",
             "发布机构": _text(item.get("pnAgency")) or "-",
             "地区": _region_text(item.get("pnRegion")) or "-",
             "政策类型": _text(item.get("pnType")) or "-",
             "发布日期": _text(item.get("pnPublishDate")) or "-",
+            "相关性": relevance,
+            "命中位置": "标题+正文" if title_hit and body_hit else "标题" if title_hit else "正文" if body_hit else "-",
+            "重复标记": "重复样本" if duplicate else "-",
         })
 
     # 政策详情 KV
@@ -440,25 +512,37 @@ def build_core_analysis(approved: Any, search: Any, policy_info: Any, subject: M
     # Derive policy type distribution from search_rows (政策类型 aggregation).
     type_counts: Dict[str, int] = {}
     for r in search_rows:
+        if r.get("相关性") != "标题确认" or r.get("重复标记") == "重复样本":
+            continue
         t = r.get("政策类型")
         if t and t != "-":
             type_counts[t] = type_counts.get(t, 0) + 1
     type_dist_rows = [{"政策类型": k, "数量": str(n)} for k, n in sorted(type_counts.items(), key=lambda kv: kv[1], reverse=True)]
 
     # 政策主题词频（来源：pnText 全文）& 政策发布时间趋势（来源：pnPublishDate）
-    keyword_freq_rows = _policy_keyword_freq_rows(search)
-    monthly_trend_rows = _policy_monthly_trend_rows(search)
+    keyword_freq_rows = _policy_keyword_freq_rows(title_confirmed_unique_items)
+    monthly_trend_rows = _policy_monthly_trend_rows(title_confirmed_unique_items)
+    relevance_summary = {
+        "上游总数": total if total is not None else "-",
+        "纳入样本数": len(search_rows),
+        "标题确认样本数（含重复）": sum(1 for r in search_rows if r.get("相关性") == "标题确认"),
+        "标题确认去重样本数": len(title_confirmed_unique_items),
+        "正文线索样本数": sum(1 for r in search_rows if r.get("相关性") == "正文线索"),
+        "未命中样本数": sum(1 for r in search_rows if r.get("相关性") == "未命中"),
+        "重复样本数": sum(1 for r in search_rows if r.get("重复标记") == "重复样本"),
+    }
 
     sections = [
         {"key": "approved_stats", "title": "立项项目统计", "kind": "kv"},
         {"key": "level_dist", "title": "项目层级分布", "kind": "donut", "note": "按申报层级（国家/省/市/区）统计获批项目占比", "chart": {"name": "层级", "value": "项目数"}, "columns": [("层级", "层级"), ("项目数", "项目数")]},
         {"key": "agency_stat", "title": "项目归口分布", "kind": "bar", "note": "按主管机构统计获批项目数量", "chart": {"name": "主管机构", "value": "项目数量", "orient": "v"}, "columns": [("主管机构", "主管机构"), ("项目数量", "项目数量")]},
         {"key": "year_project_stat", "title": "获批项目趋势", "kind": "line", "note": "按年度统计获批项目数量", "chart": {"x": "年份", "y": "获批项目数", "area": True}, "columns": [("年份", "年份"), ("获批项目数", "获批项目数")]},
-        {"key": "type_dist", "title": "政策类型分布", "kind": "pie", "note": "按政策类型统计检索命中数", "chart": {"name": "政策类型", "value": "数量", "donut": True}, "columns": [("政策类型", "政策类型"), ("数量", "数量")]},
-        {"key": "keyword_freq", "title": "政策主题词频", "kind": "bar", "note": "对政策正文(pnText)中各子主题词出现次数统计（人才/资金/培训/产业/技术…）", "chart": {"name": "主题词", "value": "出现次数", "orient": "v"}, "columns": [("主题词", "主题词"), ("出现次数", "出现次数")]},
-        {"key": "monthly_trend", "title": "政策发布时间趋势", "kind": "line", "note": "按发布月份(pnPublishDate)统计政策数量", "chart": {"x": "月份", "y": "政策数量", "area": True}, "columns": [("月份", "月份"), ("政策数量", "政策数量")]},
-        {"key": "search_records", "title": "政策检索明细", "kind": "table", "note": f"本次检索命中 {total if total is not None else '若干'} 条，展示前 {len(level_dist_rows)} 条",
-         "columns": [("政策标题", "政策标题"), ("发布机构", "发布机构"), ("地区", "地区"), ("政策类型", "政策类型"), ("发布日期", "发布日期")]},
+        {"key": "type_dist", "title": "政策类型分布", "kind": "pie", "note": "仅按标题确认且去重的归纳样本统计政策类型", "chart": {"name": "政策类型", "value": "数量", "donut": True}, "columns": [("政策类型", "政策类型"), ("数量", "数量")]},
+        {"key": "keyword_freq", "title": "政策主题词频", "kind": "bar", "note": "仅对标题确认且去重样本的正文(pnText)做子主题词统计", "chart": {"name": "主题词", "value": "出现次数", "orient": "v"}, "columns": [("主题词", "主题词"), ("出现次数", "出现次数")]},
+        {"key": "monthly_trend", "title": "政策发布时间趋势", "kind": "line", "note": "仅按标题确认且去重样本的发布月份统计", "chart": {"x": "月份", "y": "政策数量", "area": True}, "columns": [("月份", "月份"), ("政策数量", "政策数量")]},
+        {"key": "relevance_summary", "title": "检索相关性校验", "kind": "kv", "note": "保留上游 total；主题聚合仅使用标题确认且按标题+机构+日期去重的归纳样本，正文命中仅作线索"},
+        {"key": "search_records", "title": "政策检索明细", "kind": "table", "note": f"上游命中 {total if total is not None else '未知'} 条；本次归纳 {len(search_rows)} 条，标题确认相关去重样本 {len(title_confirmed_unique_items)} 条",
+         "columns": [("政策标题", "政策标题"), ("发布机构", "发布机构"), ("地区", "地区"), ("政策类型", "政策类型"), ("发布日期", "发布日期"), ("相关性", "相关性"), ("命中位置", "命中位置"), ("重复标记", "重复标记")]},
     ]
     if info_kv:
         sections.append({"key": "policy_info", "title": "政策详情", "kind": "kv", "note": f"按政策 id 查询：{subject.get('policy_id')}"})
@@ -473,6 +557,12 @@ def build_core_analysis(approved: Any, search: Any, policy_info: Any, subject: M
         "keyword_freq": keyword_freq_rows,
         "monthly_trend": monthly_trend_rows,
         "search_records": search_rows,
+        "relevance_summary": relevance_summary,
+        "source_status": {
+            "approved_stats": _payload_status(approved) if subject.get("enterprise") else "not_requested",
+            "policy_search": _payload_status(search),
+            "policy_info": _payload_status(policy_info) if subject.get("policy_id") else "not_requested",
+        },
         "policy_info": info_kv,
     }
 
@@ -485,6 +575,8 @@ def build_records(core: Mapping[str, Any]) -> List[Dict[str, Any]]:
             "发布机构": item.get("发布机构") or "-",
             "政策类型": item.get("政策类型") or "-",
             "发布日期": item.get("发布日期") or "-",
+            "相关性": item.get("相关性") or "-",
+            "重复标记": item.get("重复标记") or "-",
         })
     return out[:20]
 
@@ -530,11 +622,9 @@ def _year_trend_analysis(rows: List[Mapping[str, Any]]) -> Dict[str, Any]:
     return {"peak_period": rows[peak_idx].get("年份", "-"), "peak_value": nums[peak_idx], "direction": direction, "yoy": yoy, "last": nums[-1]}
 
 
-def build_insights(subject: Mapping[str, Any], core: Mapping[str, Any], metrics: List[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+def build_insights(subject: Mapping[str, Any], core: Mapping[str, Any], metrics: Sequence[Mapping[str, Any]]) -> List[Dict[str, Any]]:
     insights: List[Dict[str, Any]] = []
     metric_map = {m["label"]: str(m["value"]) for m in metrics}
-    approved_kv = core.get("approved_stats") or {}
-
     # 1. 项目申报层级（高阶占比）
     level_dist = core.get("level_dist") or []
     if level_dist:
@@ -552,7 +642,7 @@ def build_insights(subject: Mapping[str, Any], core: Mapping[str, Any], metrics:
             insights.append({
                 "feature": "项目层级结构与高阶占比",
                 "evidence": f"获批项目共 {int(conc['total'])} 个，国家级+省级合计占 {high_share:.0f}%；最多为“{conc['top']}”（{conc['top_share']:.0f}%）。",
-                "interpretation": "高阶（国家/省级）项目占比越高，企业承担重大专项、获得政府认可的能力越强；偏低则多以市区级普惠政策为主。",
+                "interpretation": "该占比仅描述已返回获批项目的层级结构，不能据此推断企业能力、政府认可程度或未来获批概率。",
             })
 
     # 2. 项目归口集中度（CR3）
@@ -564,7 +654,7 @@ def build_insights(subject: Mapping[str, Any], core: Mapping[str, Any], metrics:
             insights.append({
                 "feature": "项目归口集中度",
                 "evidence": f"“{conc['top']}”获批项目占比约 {conc['top_share']:.0f}%，前 3 主管机构合计 {conc['cr']:.0f}%（CR3）。",
-                "interpretation": f"归口分布{focus}；高度集中意味着主要政策渠道稳定，分散则需对接多个部门，建议聚焦主力渠道深耕。",
+                "interpretation": f"当前返回样本的归口分布{focus}；这是历史分布观察，不证明渠道稳定性或申报成效。",
             })
 
     # 3. 获批项目年度趋势
@@ -575,7 +665,7 @@ def build_insights(subject: Mapping[str, Any], core: Mapping[str, Any], metrics:
             insights.append({
                 "feature": "获批项目趋势",
                 "evidence": f"峰值在“{ta['peak_period']}”（{ta['peak_value']:.0f} 个），近年{ta['direction']}，{ta.get('yoy', '')}。",
-                "interpretation": "获批量上升反映政策红利期或企业申报能力增强；下降可能是政策窗口收窄或竞争加剧，需提前布局下一年度申报。",
+                "interpretation": "年度变化仅是已返回项目数量的描述性趋势；没有外部政策、竞争或申报过程证据，不能解释变化原因。",
             })
 
     # 4. 政策类型集中度（基于检索结果聚合）
@@ -586,15 +676,16 @@ def build_insights(subject: Mapping[str, Any], core: Mapping[str, Any], metrics:
             insights.append({
                 "feature": "政策类型结构",
                 "evidence": f"检索政策中“{conc['top']}”类占比约 {conc['top_share']:.0f}%，前 3 类合计 {conc['cr']:.0f}%（CR3）。",
-                "interpretation": "申报指南占比高意味当前有较多可申报机会；公示公开偏多则说明已有较多同类项目落地，竞争需评估。",
+                "interpretation": "该比例仅描述归纳样本中标题确认且去重样本的类型构成，不代表可申报机会数量、实施成效或竞争强度。",
             })
 
     # 5. 政策匹配广度 + 地区覆盖
     search_total = metric_map.get("政策检索结果")
     search_rows = core.get("search_records") or []
+    relevant_rows = [r for r in search_rows if r.get("相关性") == "标题确认" and r.get("重复标记") != "重复样本"]
     if search_total and search_rows:
         regions = set()
-        for r in search_rows:
+        for r in relevant_rows:
             rg = r.get("地区")
             if rg and rg != "-":
                 # split on comma to count provinces
@@ -605,8 +696,8 @@ def build_insights(subject: Mapping[str, Any], core: Mapping[str, Any], metrics:
         region_clause = f"，覆盖地区 {len(regions)} 个" if regions else ""
         insights.append({
             "feature": "政策匹配广度",
-            "evidence": f"按关键词“{subject.get('keyword')}”检索命中政策 {search_total} 条{region_clause}。",
-            "interpretation": "命中量反映关键词与现行政策的关联广度；覆盖地区多说明政策适用范围广，可结合类型与机构筛选高价值政策。",
+            "evidence": f"上游返回 total={search_total}；归纳样本中标题确认且去重的样本 {len(relevant_rows)} 条{region_clause}。",
+            "interpretation": "上游 total 未经本地相关性过滤；正文命中仅作为待复核线索，只能基于归纳样本中标题确认样本做描述，不外推政策适用范围或价值。",
         })
 
     if not insights:
@@ -618,13 +709,20 @@ def build_insights(subject: Mapping[str, Any], core: Mapping[str, Any], metrics:
     return insights
 
 
-def build_abstract(subject: Mapping[str, Any], core: Mapping[str, Any], metrics: List[Mapping[str, Any]]) -> str:
+def build_abstract(subject: Mapping[str, Any], core: Mapping[str, Any], metrics: Sequence[Mapping[str, Any]]) -> str:
     kw = subject.get("keyword") or "目标政策关键词"
-    parts = [f"本报告以政策关键词“{kw}”为检索对象，基于政策公开数据，系统呈现立项项目统计、项目归口分布、获批项目趋势、政策检索明细与政策详情。"]
+    scopes = ["政策检索明细"]
+    if subject.get("enterprise"):
+        scopes.extend(["立项项目统计", "项目归口分布", "获批项目趋势"])
+    if subject.get("policy_id"):
+        scopes.append("政策详情")
+    parts = [f"本报告以政策关键词“{kw}”为检索对象，基于政策公开数据，系统呈现{'、'.join(scopes)}。"]
+    if subject.get("enterprise_blocked_reason"):
+        parts.append("企业主体未唯一解析，未执行企业立项统计；以下内容仅为独立政策关键词检索结果。")
     if metrics:
         kv = "、".join(f"{m['label']} {m['value']}" for m in metrics[:5])
         parts.append(f"关键指标包括：{kv}。")
-    parts.append("报告同时给出项目申报层级、归口集中度与申报活跃度的结构化解读，便于政策申报规划与政府扶持分析参考。")
+    parts.append("检索聚合仅使用归纳样本中标题确认且按稳定字段去重的样本；正文命中仅保留为待复核线索，上游 total 原样保留，分布与趋势不作因果解释。")
     return "".join(parts)
 
 
@@ -650,7 +748,7 @@ def build_dry_run_payload(keyword: str, filters: Mapping[str, Any]) -> Dict[str,
 # Assembly
 # --------------------------------------------------------------------------- #
 
-def _assemble(subject: Mapping[str, Any], core: Mapping[str, Any], metrics: List[Mapping[str, Any]], *, dry_run: bool) -> Dict[str, Any]:
+def _assemble(subject: Mapping[str, Any], core: Mapping[str, Any], metrics: Sequence[Mapping[str, Any]], *, dry_run: bool) -> Dict[str, Any]:
     abstract = build_abstract(subject, core, metrics)
     records = build_records(core)
     insights = build_insights(subject, core, metrics)
@@ -688,32 +786,35 @@ def _assemble(subject: Mapping[str, Any], core: Mapping[str, Any], metrics: List
         "insights": insights,
         "data_source": {
             "mcp_server": "policy-mcp-server",
-            "products": [
-                {"name": "立项项目统计", "product_id": "66c702b725f04ab44cd24c9c"},
-                {"name": "企业模糊查询", "product_id": "675cea1f0e009a9ea37edaa1"},
-                {"name": "政策详情", "product_id": "66c702b725f04ab44cd24cd6"},
-                {"name": "政策检索", "product_id": "66c702b725f04ab44cd24ceb"},
-            ],
+            "products": _requested_product_rows(subject),
             "generated_at": dt.datetime.now().astimezone().isoformat(timespec="seconds"),
             "dry_run": dry_run,
+            "source_status": core.get("source_status", {}),
+            "blocked_reason": subject.get("enterprise_blocked_reason") or None,
             "quality_report": quality_report,
         },
     }
 
 
-def build_payload(keyword: str, filters: Mapping[str, Any], page_size: int) -> Dict[str, Any]:
+@paid_call_scope
+def build_payload(keyword: str, filters: Mapping[str, Any], page_size: int, max_pages: int = 1) -> Dict[str, Any]:
+    if isinstance(max_pages, bool) or not isinstance(max_pages, int) or max_pages < 1:
+        raise ValueError("max_pages 必须为正整数")
     # 1. 政策检索（关键词驱动，始终执行）
     search_args: Dict[str, Any] = {
         "matchKeyword": keyword,
         "pnType": filters.get("pn_type") or "全部",
-        "pageIndex": 1,
         "pageSize": page_size,
     }
     if filters.get("agency"):
         search_args["agency"] = filters["agency"]
     if filters.get("address"):
         search_args["address"] = filters["address"]
-    search = _safe_call(T_POLICY_SEARCH, search_args)
+    search = collect_detail_pages(
+        _safe_call, T_POLICY_SEARCH, search_args,
+        get_rows=_first_list, get_total=_safe_total, is_error=_is_api_error,
+        max_pages=max_pages,
+    )
     search_total = _safe_total(search) if isinstance(search, dict) else None
 
     # 2. 立项项目统计（企业驱动，仅在提供 --enterprise 时执行）
@@ -721,7 +822,7 @@ def build_payload(keyword: str, filters: Mapping[str, Any], page_size: int) -> D
     enterprise_resolved: Dict[str, Any] = {"enterprise": "", "resolved": False, "reason": "未提供企业主体"}
     if filters.get("enterprise"):
         enterprise_resolved = resolve_enterprise_name(filters["enterprise"])
-        if enterprise_resolved.get("enterprise"):
+        if enterprise_resolved.get("resolved") and enterprise_resolved.get("enterprise"):
             approved = _safe_call(T_APPROVED_STATS, {
                 "matchKeyword": enterprise_resolved["enterprise"],
                 "keywordType": "name",
@@ -738,7 +839,8 @@ def build_payload(keyword: str, filters: Mapping[str, Any], page_size: int) -> D
     # --- Enterprise profile enrichment (from fuzzy_search) ---
     _enrich_metrics_with_profile(metrics, enterprise_resolved.get("record") if isinstance(enterprise_resolved, dict) else None)
     _derive_core_metrics(metrics, core if isinstance(core, dict) else {})
-    return _assemble(subject, core, metrics, dry_run=False)
+    report = _assemble(subject, core, metrics, dry_run=False)
+    return attach_pagination(report, {"政策检索": search})
 
 
 # --------------------------------------------------------------------------- #
@@ -754,6 +856,7 @@ def main() -> None:
     parser.add_argument("--address", default=None, help="可选地区过滤，例如 [[\"福建省\"]] 或 [[\"国家部委\"]]；以 JSON 字符串传入")
     parser.add_argument("--policy-id", default=None, help="可选政策 id，用于查询政策详情")
     parser.add_argument("--page-size", type=int, default=10, help="政策检索明细分页大小（最多 50）")
+    parser.add_argument("--max-pages", type=int, default=1, help="政策检索明细最多付费翻页数（默认 1；仅在明确需要更多结论/证据时增大）")
     parser.add_argument("--dry-run", action="store_true", help="不调用真实 MCP，使用样例数据组装报告骨架")
     parser.add_argument("--output", help="输出 JSON 路径；省略则打印到 stdout")
     parser.add_argument("--report-output", help="同时输出 HTML 报告（.html）与 Markdown 报告（.md）")
@@ -768,10 +871,14 @@ def main() -> None:
         "policy_id": args.policy_id,
     }
 
+    if not args.dry_run:
+        if args.max_pages is not None and args.max_pages < 1:
+            die("--max-pages 必须为正整数")
+
     if args.dry_run:
         payload = build_dry_run_payload(args.keyword, filters)
     else:
-        payload = build_payload(args.keyword, filters, args.page_size)
+        payload = build_payload(args.keyword, filters, args.page_size, args.max_pages)
 
     if args.output:
         out = pathlib.Path(args.output).expanduser()
