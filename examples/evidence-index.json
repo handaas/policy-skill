@@ -17,7 +17,7 @@
         "business-review.json": "13141c251cff814cc5355aabd864a0e2ad60cc4242bbf9c4508eb20021defb5d",
         "browser-check.json": "01a9bca298ccbd13f443af285cc0a242dcf0f979705f51909e8222c4a606b9d4"
       },
-      "audit_record": "../../test-records/live-replaced-20261027/09-jiangmen-specialized-action.md"
+      "audit_record": "../test-records/live-replaced-20261027/09-jiangmen-specialized-action.md"
     },
     {
       "skill": "policy-skill",
@@ -35,7 +35,7 @@
         "business-review.json": "eea81084f236e369d98fc865f405f710b71e3ef98a6810cf53a6eede2f903085",
         "browser-check.json": "7fb2ff93eedbfa3d97dabc0259aa67a51680a5b71a2dd0fb5bce69082f404e2c"
       },
-      "audit_record": "../../test-records/live-replaced-20261027/04-enterprise-approved-projects.md"
+      "audit_record": "../test-records/live-replaced-20261027/04-enterprise-approved-projects.md"
     },
     {
       "skill": "policy-skill",
@@ -53,7 +53,7 @@
         "business-review.json": "e1c57d52fb7d8075b4e8e01083d860544158bea9731c933d8ec58784a9ff739f",
         "browser-check.json": "432c2fc9e377f8ba68713069db664b1e1075884654b2b5aa8059aaa88bf8987c"
       },
-      "audit_record": "../../test-records/live-replaced-20261027/05-local-digital-economy.md"
+      "audit_record": "../test-records/live-replaced-20261027/05-local-digital-economy.md"
     },
     {
       "skill": "policy-skill",
@@ -71,7 +71,7 @@
         "business-review.json": "33ecf31f81041f7a273b0f115c5455a56484f7f2e9d399610d3f82315d5ca4b9",
         "browser-check.json": "7759da24d0bedb8d6c913c7a706e985844f1cc5fe57b3759846c726aa4df4a50"
       },
-      "audit_record": "../../test-records/live-replaced-20261027/07-rural-revitalization.md"
+      "audit_record": "../test-records/live-replaced-20261027/07-rural-revitalization.md"
     }
   ]
 }
