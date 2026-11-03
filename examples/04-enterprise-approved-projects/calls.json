@@ -1,0 +1,126 @@
+[
+  {
+    "tool": "policy_bigdata_policy_search",
+    "domain": null,
+    "arguments": {
+      "matchKeyword": "科技创新",
+      "pnType": "全部",
+      "pageIndex": 1,
+      "pageSize": 10
+    },
+    "invocation_id": "1793070077533362000",
+    "elapsed_seconds": 1.269,
+    "status": "data",
+    "error_category": null,
+    "result_type": "dict",
+    "top_level_fields": [
+      "resultList",
+      "total"
+    ],
+    "row_count": 10,
+    "reported_total": 10000,
+    "numeric_evidence": [
+      {
+        "path": "total",
+        "value": 10000
+      }
+    ],
+    "response_sha256": "e064081ccf972efa8f4c175ee721bea10b8b4b4f003868f8ba93422ea577b89d"
+  },
+  {
+    "tool": "policy_bigdata_approved_project_stats",
+    "domain": null,
+    "arguments": {
+      "matchKeyword": "华为技术有限公司",
+      "keywordType": "name"
+    },
+    "invocation_id": "1793070077533362000",
+    "elapsed_seconds": 1.746,
+    "status": "data",
+    "error_category": null,
+    "result_type": "dict",
+    "top_level_fields": [
+      "ppeAgencyStat",
+      "ppeLevelStat",
+      "ppeYearAmountStat",
+      "ppeYearProjectStat"
+    ],
+    "row_count": null,
+    "reported_total": null,
+    "numeric_evidence": [
+      {
+        "path": "ppeAgencyStat[0].count",
+        "value": 1
+      },
+      {
+        "path": "ppeAgencyStat[1].count",
+        "value": 1
+      },
+      {
+        "path": "ppeAgencyStat[2].count",
+        "value": 2
+      },
+      {
+        "path": "ppeAgencyStat[3].count",
+        "value": 1
+      },
+      {
+        "path": "ppeAgencyStat[4].count",
+        "value": 1
+      },
+      {
+        "path": "ppeLevelStat.districtProjectCount",
+        "value": 15
+      },
+      {
+        "path": "ppeLevelStat.municipalProjectCount",
+        "value": 20
+      },
+      {
+        "path": "ppeLevelStat.nationalProjectCount",
+        "value": 13
+      },
+      {
+        "path": "ppeLevelStat.provincialProjectCount",
+        "value": 14
+      },
+      {
+        "path": "ppeYearAmountStat[0].amount",
+        "value": 5000000.0
+      },
+      {
+        "path": "ppeYearAmountStat[1].amount",
+        "value": 8069406.72
+      },
+      {
+        "path": "ppeYearAmountStat[2].amount",
+        "value": 30559100.0
+      },
+      {
+        "path": "ppeYearAmountStat[3].amount",
+        "value": 400000.0
+      },
+      {
+        "path": "ppeYearProjectStat[0].count",
+        "value": 9
+      },
+      {
+        "path": "ppeYearProjectStat[1].count",
+        "value": 7
+      },
+      {
+        "path": "ppeYearProjectStat[2].count",
+        "value": 17
+      },
+      {
+        "path": "ppeYearProjectStat[3].count",
+        "value": 17
+      },
+      {
+        "path": "ppeYearProjectStat[4].count",
+        "value": 1
+      }
+    ],
+    "response_sha256": "717d697d22861b04cfddfc1b1bca1e55472a29c0ede9bc673e3f4f76cfe3db6f"
+  }
+]

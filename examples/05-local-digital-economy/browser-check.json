@@ -1,0 +1,46 @@
+{
+  "metric_overflows": [],
+  "document_title": "“数字经济” 政策大数据报告",
+  "title_matches": true,
+  "charts": 3,
+  "rendered_charts": 3,
+  "zero_size_charts": 0,
+  "chart_details": [
+    {
+      "width": 984,
+      "height": 300,
+      "instance": true,
+      "renderer": true,
+      "graphics": 7
+    },
+    {
+      "width": 984,
+      "height": 300,
+      "instance": true,
+      "renderer": true,
+      "graphics": 35
+    },
+    {
+      "width": 984,
+      "height": 300,
+      "instance": true,
+      "renderer": true,
+      "graphics": 27
+    }
+  ],
+  "page_width": 1905,
+  "viewport_width": 1920,
+  "empty_headers": 0,
+  "script_errors": [],
+  "external_resources": 0,
+  "external_asset_references": 0,
+  "ok": true,
+  "report_html_sha256": "b763abd57fbcfbd320a11671e1f91b001088522ed1f08a88c9d54946936e1703",
+  "report_json_sha256": "0095f936826949a3f1281c91e73560bc0a83b7fa8cc029a2276877962a37bd64",
+  "skill": "policy-skill",
+  "id": "05-local-digital-economy",
+  "browser": "Ego Lite",
+  "space_id": 4,
+  "offline": true,
+  "checked_at": "2026-10-27T03:03:51.835Z"
+}

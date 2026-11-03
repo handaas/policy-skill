@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "skill": "policy-skill",
+  "case_id": "09-jiangmen-specialized-action",
+  "title": "江门专精特新赋能行动精确检索",
+  "invocation_id": "1793070075640030000",
+  "provenance": {
+    "integrator_id": "683e574805537ace146cc05e",
+    "runner_sha256": "05777c2f2b0791cb5157aef691206606dade8df7af3b17212285b7ae74632a66",
+    "credential_policy_sha256": "bcabf08a1ca92f28357c0e57a8bae9bfa910eb1d4b204d8195ee3b7a77106eed",
+    "scenario_sha256": "a9c2ee767c138adbaef9c65e78b44bc64516080027f55ebf2bb63e9a5db55794",
+    "skill_source_hashes": {
+      "scripts/common.py": "e3bddaa56284efe9e963bb8fd9749a13afec7a37b4355daf3d902251243680b5",
+      "scripts/compose_report.py": "37c32c6fea05e82cbe175b656be2a7e59dd268dae9eb01227e1c17ccf45a82ba",
+      "scripts/mcp_client.py": "032ebb6a99427031f65d03c9588fe7c32ce8064e0a5480ac6bd1918a914c5c0e",
+      "scripts/render_report.py": "0c638b43ffc6410ef4cda94ee51d3e50dc83dea9d32de20ef0521cf9ee4e2cfe",
+      "scripts/validate_config.py": "c146c2ad5a121483dc5a638f6d393ef0a5eb10904bb15305b02a435c9d28cece"
+    },
+    "upstream_source_hashes": {
+      "policy-mcp-server": "298984f4dbd1f7a39fa3a4fde6e1c7fff11acce6242dd61c35779b7f277ba179"
+    },
+    "upstream_dependency_hashes": {
+      "policy-mcp-server/server/mcp_server.py": "298984f4dbd1f7a39fa3a4fde6e1c7fff11acce6242dd61c35779b7f277ba179"
+    }
+  },
+  "source_changed_during_run": false,
+  "started_at": "2026-10-27T11:01:15+08:00",
+  "elapsed_seconds": 1.196,
+  "returncode": 0,
+  "exception_type": null,
+  "command": "python3 policy-skill/scripts/compose_report.py --keyword '专精特新企业赋能行动' --pn-type '申报指南' --agency '江门市工业和信息化局' --page-size 10 --output policy-skill/output/live-replaced-20261027/09-jiangmen-specialized-action/report.json --report-output policy-skill/output/live-replaced-20261027/09-jiangmen-specialized-action/report.html",
+  "transport": "local MCP servers via loopback streamable-http",
+  "cache_used": false,
+  "call_count": 1,
+  "successful_data_calls": 1,
+  "empty_calls": 0,
+  "failed_calls": 0,
+  "checks": {
+    "issues": [],
+    "warnings": [],
+    "coverage_pct": 56,
+    "subject": {
+      "keyword": "专精特新企业赋能行动",
+      "matchKeyword": "专精特新企业赋能行动",
+      "enterprise": "",
+      "enterprise_input": "",
+      "enterprise_resolved": false,
+      "enterprise_resolve_reason": "未提供企业主体",
+      "enterprise_blocked_reason": "",
+      "pn_type": "申报指南",
+      "agency": "江门市工业和信息化局",
+      "address": "",
+      "policy_id": ""
+    },
+    "title": "“专精特新企业赋能行动” 政策大数据报告",
+    "data_mode": null,
+    "metrics": [
+      {
+        "label": "政策检索结果",
+        "value": "2",
+        "hint": "本次政策检索命中条数"
+      },
+      {
+        "label": "政策类型数",
+        "value": "1",
+        "hint": "涉及的政策类型数"
+      },
+      {
+        "label": "高频主题词",
+        "value": "3",
+        "hint": "出现频次较高的主题词数"
+      },
+      {
+        "label": "最热主题",
+        "value": "技术",
+        "hint": "出现频次最高的主题词"
+      },
+      {
+        "label": "覆盖月份",
+        "value": "2",
+        "hint": "有政策发布的月份数"
+      },
+      {
+        "label": "发布机构数",
+        "value": "1",
+        "hint": "涉及的政策发布机构数"
+      }
+    ],
+    "quality_report": {
+      "total_sections": 9,
+      "populated_sections": 5,
+      "empty_sections": 4,
+      "coverage_pct": 56
+    },
+    "unregistered_tools": [],
+    "checks": {
+      "json_html_markdown": true,
+      "explicit_live": true,
+      "tool_calls_recorded": 1,
+      "offline_scripts": true,
+      "independent_rerender": true,
+      "offline_browser": true
+    }
+  },
+  "status": "passed",
+  "source_hashes": {
+    "scripts/common.py": "e3bddaa56284efe9e963bb8fd9749a13afec7a37b4355daf3d902251243680b5",
+    "scripts/compose_report.py": "37c32c6fea05e82cbe175b656be2a7e59dd268dae9eb01227e1c17ccf45a82ba",
+    "scripts/mcp_client.py": "032ebb6a99427031f65d03c9588fe7c32ce8064e0a5480ac6bd1918a914c5c0e",
+    "scripts/render_report.py": "0c638b43ffc6410ef4cda94ee51d3e50dc83dea9d32de20ef0521cf9ee4e2cfe",
+    "scripts/validate_config.py": "c146c2ad5a121483dc5a638f6d393ef0a5eb10904bb15305b02a435c9d28cece"
+  },
+  "technical_status": "passed",
+  "audited_at": "2026-10-27T11:13:02+08:00",
+  "evidence_binding": {
+    "report.json": "56614cdfc99c43fb21cb8c71615420998cd9d5dba211072cde58bc5d7754cab0",
+    "report.html": "50f02057f61dc3c052e1e7b1b1f89b9f8a6ca0fc50f37d2dbef8554926871be8",
+    "report.md": "933174fc59e60dd55e216b6c1a9eb64eff972d2fc577825c2c64b6128655ac37",
+    "calls.json": "b3b24c5237e3c18638354cd02a3a507b69a087b58802885d879796dfdfb65b0f",
+    "result.json": "28457c65661c4966ba7d8addf927585db0d9d459b087090f71e2750cb0c97816",
+    "source_manifest_sha256": "014e0c39ccd221d4b037bfafc75dc705b73521da54c003be18fa8ca62d4dab92"
+  }
+}

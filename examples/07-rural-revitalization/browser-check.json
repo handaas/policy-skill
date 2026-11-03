@@ -1,0 +1,46 @@
+{
+  "metric_overflows": [],
+  "document_title": "“乡村振兴” 政策大数据报告",
+  "title_matches": true,
+  "charts": 3,
+  "rendered_charts": 3,
+  "zero_size_charts": 0,
+  "chart_details": [
+    {
+      "width": 984,
+      "height": 300,
+      "instance": true,
+      "renderer": true,
+      "graphics": 7
+    },
+    {
+      "width": 984,
+      "height": 300,
+      "instance": true,
+      "renderer": true,
+      "graphics": 21
+    },
+    {
+      "width": 984,
+      "height": 300,
+      "instance": true,
+      "renderer": true,
+      "graphics": 23
+    }
+  ],
+  "page_width": 1905,
+  "viewport_width": 1920,
+  "empty_headers": 0,
+  "script_errors": [],
+  "external_resources": 0,
+  "external_asset_references": 0,
+  "ok": true,
+  "report_html_sha256": "35014b4ee0b353e42fcdfea4e79a75c65bcba112762c9c64d09acf4211002a57",
+  "report_json_sha256": "b411bdc29f07e6715af96a5576e88d843fc2fe1ec4518db6f3014e9a69c4122c",
+  "skill": "policy-skill",
+  "id": "07-rural-revitalization",
+  "browser": "Ego Lite",
+  "space_id": 4,
+  "offline": true,
+  "checked_at": "2026-10-27T03:03:54.181Z"
+}

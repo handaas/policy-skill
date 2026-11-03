@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="icon" href="data:," />
-  <title>“房地产” 政策大数据报告</title>
+  <title>“数字经济” 政策大数据报告</title>
   <style>
     :root { --bg:#eef1f5; --card:#ffffff; --text:#1f2937; --muted:#64748b; --line:#d8dee8; --blue:#003b71; --deep:#003b71; --red:#7f1d1d; --gold:#d97706; --stripe:#666; }
     * { box-sizing:border-box; letter-spacing:0 !important; }
@@ -145,6 +145,7 @@
     .chart-box-gauge { max-width:380px; }
     .chart-title { margin:0 0 8px; color:#0b3768; font-size:15px; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
     .chart-canvas { width:100%; height:300px; }
+    .chart-canvas[data-chart-state="waiting"],.chart-canvas[data-chart-state="error"] { display:flex; align-items:center; justify-content:center; color:#64748b; font-size:13px; text-align:center; }
     .chart-box-gauge .chart-canvas { height:240px; }
     .chart-data { margin-top:10px; }
     .chart-data summary { cursor:pointer; color:#0b5ca8; font-size:12px; font-weight:700; padding:4px 0; }
@@ -212,16 +213,70 @@ var Fr={},Gr={};var Wr,Hr=function(){function t(t,e,n){var i=this;this._sleepAft
 </script>
   <script>
 (function(){
-  window.__echarts_instances=[];
+  if(window.__handaas_boot_charts){window.__handaas_boot_charts();return;}
+  window.__echarts_instances=window.__echarts_instances||[];
+  var status=window.__handaas_chart_status={state:'waiting',total:0,ready:0,failed:0};
+  var timer=null, retries=0, MAX_RETRIES=100;
+  var layoutRetries=0, MAX_LAYOUT_RETRIES=50;
+  var PALETTE=['#0b5ca8','#0284c7','#0b3768','#d97706','#059669','#dc2626','#7c3aed','#db2777','#0891b2','#65a30d'];
+  var FONTS='-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif';
+  function summarize(nodes){
+    status.total=nodes.length;status.ready=0;status.failed=0;
+    nodes.forEach(function(el){
+      if(el.getAttribute('data-chart-state')==='ready'){status.ready++;}
+      else if(el.getAttribute('data-chart-state')==='error'){status.failed++;}
+    });
+    status.state=status.ready===status.total?'ready':
+      (status.ready+status.failed===status.total?(status.ready?'degraded':'error'):'waiting');
+  }
+  function raf(fn){if(window.requestAnimationFrame){window.requestAnimationFrame(fn);}else{fn();}}
   function boot(){
-    if(typeof echarts==='undefined'){return;}
-    var PALETTE=['#0b5ca8','#0284c7','#0b3768','#d97706','#059669','#dc2626','#7c3aed','#db2777','#0891b2','#65a30d'];
-    var FONTS='-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif';
-    document.querySelectorAll('.chart-canvas').forEach(function(el){
-      var raw=el.getAttribute('data-spec'); if(!raw){return;}
-      var spec; try{spec=JSON.parse(raw.replace(/&quot;/g,'"').replace(/&amp;/g,'&'));}catch(e){return;}
-      var chart=echarts.init(el,null,{renderer:'svg'});
-      window.__echarts_instances.push(chart);
+    if(document.readyState==='loading'){return;}
+    var nodes=document.querySelectorAll('.chart-canvas');
+    if(!nodes.length){summarize(nodes);return;}
+    if(!window.echarts || typeof window.echarts.init!=='function'){
+      var exhausted=retries>=MAX_RETRIES;
+      nodes.forEach(function(el){
+        if(el.__handaas_chart_ready){return;}
+        el.__handaas_dependency_error=true;
+        el.setAttribute('data-chart-state',exhausted?'error':'waiting');
+        el.textContent=exhausted?'图表库加载失败或不可用，请查看数据明细或重新生成离线报告。':'图表库正在加载，数据明细仍可查看。';
+      });
+      summarize(nodes);
+      if(!exhausted && timer===null){
+        retries++;
+        timer=setTimeout(function(){timer=null;boot();},100);
+      }
+      return;
+    }
+    if(timer!==null){clearTimeout(timer);timer=null;}
+    var pendingLayout=0;
+    nodes.forEach(function(el){
+      if(el.__handaas_chart_ready){return;}
+      if(el.getAttribute('data-chart-state')==='error' && !el.__handaas_dependency_error){return;}
+      if(window.ResizeObserver && !el.__handaas_resize_observer){
+        el.__handaas_resize_observer=new ResizeObserver(function(){
+          var current=el.__handaas_chart;
+          if(current && typeof current.resize==='function'){try{current.resize();}catch(ignored){}}
+          else{boot();}
+        });
+        el.__handaas_resize_observer.observe(el);
+      }
+      if((el.getClientRects && el.getClientRects().length===0) || el.clientWidth<2 || el.clientHeight<2){
+        el.setAttribute('data-chart-state','waiting');
+        el.textContent='图表等待布局完成后渲染，数据明细仍可查看。';
+        pendingLayout++;
+        return;
+      }
+      var chart=null;
+      try{
+        var raw=el.getAttribute('data-spec');
+        if(!raw){throw new Error('Missing chart configuration');}
+        // getAttribute already decodes HTML entities; a second decode corrupts labels.
+        var spec=JSON.parse(raw);
+        if(['line','bar','pie','gauge','radar'].indexOf(spec.type)<0){throw new Error('Unsupported chart type');}
+        el.textContent='';
+        chart=window.echarts.init(el,null,{renderer:'svg'});
       var opt={color:PALETTE,tooltip:{trigger: spec.type==='pie'?'item':'axis'},textStyle:{fontFamily:FONTS,fontSize:12,color:'#334155'},grid:{left:48,right:24,top:30,bottom:40},legend:{top:0,textStyle:{fontSize:11}}};
       if(spec.type==='line'){
         opt.xAxis={type:'category',data:spec.x,axisLabel:{fontSize:11,interval:0,rotate: spec.x && spec.x.length>6?35:0}};
@@ -247,14 +302,47 @@ var Fr={},Gr={};var Wr,Hr=function(){function t(t,e,n){var i=this;this._sleepAft
         opt.radar={indicator:spec.indicators,radius:'62%',axisName:{color:'#475569',fontSize:11},splitArea:{areaStyle:{color:['#f8fbff','#eef4fb']}}};
         opt.series=[{type:'radar',areaStyle:{opacity:0.18},data:spec.series}];
       }
-      chart.setOption(opt);
-      window.addEventListener('resize',function(){chart.resize();});
+        chart.setOption(opt);
+        el.__handaas_chart=chart;
+        el.__handaas_chart_ready=true;
+        el.__handaas_dependency_error=false;
+        el.setAttribute('data-chart-state','ready');
+        window.__echarts_instances.push(chart);
+        raf(function(){try{chart.resize();}catch(ignored){}});
+      }catch(e){
+        if(chart && typeof chart.dispose==='function'){try{chart.dispose();}catch(ignored){}}
+        el.__handaas_dependency_error=false;
+        el.setAttribute('data-chart-state','error');
+        el.textContent='图表绘制失败，请查看数据明细。';
+      }
     });
+    summarize(nodes);
+    if(pendingLayout && layoutRetries<MAX_LAYOUT_RETRIES){
+      layoutRetries++;
+      setTimeout(boot,100);
+    }
   }
-  if(document.readyState!=='loading'){boot();}else{document.addEventListener('DOMContentLoaded',boot);}
+  window.__handaas_boot_charts=boot;
   window.__echarts_resize_all=function(){
     (window.__echarts_instances||[]).forEach(function(c){try{c.resize();}catch(e){}});
   };
+  function bootAfterLayout(){
+    raf(function(){boot();window.__echarts_resize_all();});
+  }
+  window.addEventListener('resize',window.__echarts_resize_all);
+  window.addEventListener('load',bootAfterLayout);
+  window.addEventListener('pageshow',bootAfterLayout);
+  window.addEventListener('handaas:echarts-ready',bootAfterLayout);
+  window.addEventListener('orientationchange',bootAfterLayout);
+  // A very late external script can still recover after the bounded retry ends.
+  document.addEventListener('load',function(event){
+    if(event.target && event.target.tagName==='SCRIPT'){boot();}
+  },true);
+  document.addEventListener('DOMContentLoaded',bootAfterLayout);
+  document.addEventListener('visibilitychange',boot);
+  if(document.fonts && document.fonts.ready){document.fonts.ready.then(function(){window.__echarts_resize_all();});}
+  [0,300,1000,2500].forEach(function(ms){setTimeout(function(){boot();window.__echarts_resize_all();},ms);});
+  boot();
 })();
 </script>
 </head>
@@ -264,58 +352,43 @@ var Fr={},Gr={};var Wr,Hr=function(){function t(t,e,n){var i=this;this._sleepAft
     <div class="cover-grid">
       <aside class="cover-side">
         <h2 class="cover-side-title">政策大数据报告</h2>
-        <p class="cover-date">2026年08月10日</p>
+        <p class="cover-date">2026年10月27日</p>
         <h3 class="toc-title">目录</h3>
         <ol class="toc-list"><li><span>报告摘要</span></li><li><span>查询对象与口径</span></li><li><span>数据总览</span></li><li><span>核心分析</span></li><li><span>代表性记录</span></li><li><span>特征与洞察</span></li></ol>
         <h3 class="scope-title">报告口径</h3>
-        <div class="biz-scope"><div class="biz-scope-item"><span>匹配对象</span><strong>政策关键词“房地产” / 企业“恒大地产集团有限公司”</strong></div><div class="biz-scope-item"><span>匹配方式</span><strong>政策检索按政策关键词匹配（pnType=全部）；立项项目统计按企业主体“恒大地产集团有限公司”匹配</strong></div><div class="biz-scope-item"><span>数据范围</span><strong>立项项目统计、政策检索明细、政策详情</strong></div><div class="biz-scope-item"><span>局限说明</span><strong>数据来自政策公开数据库；少量字段可能存在更新延迟。</strong></div></div>
+        <div class="biz-scope"><div class="biz-scope-item"><span>匹配对象</span><strong>政策关键词“数字经济”</strong></div><div class="biz-scope-item"><span>匹配方式</span><strong>政策检索按政策关键词匹配（pnType=公示公开）</strong></div><div class="biz-scope-item"><span>数据范围</span><strong>政策检索明细</strong></div><div class="biz-scope-item"><span>局限说明</span><strong>数据来自政策公开数据库；少量字段可能存在更新延迟。</strong></div></div>
       </aside>
       <section class="cover-main">
         <p class="report-kicker">POLICY DATA RESEARCH</p>
-        <h1>“房地产” 政策大数据报告</h1>
-        <p class="report-lead">本报告以政策关键词“房地产”为检索对象，基于政策公开数据，系统呈现立项项目统计、项目归口分布、获批项目趋势、政策检索明细与政策详情。关键指标包括：市级项目 1、政策检索结果 10000。报告同时给出项目申报层级、归口集中度与申报活跃度的结构化解读，便于政策申报规划与政府扶持分析参考</p>
+        <h1>“数字经济” 政策大数据报告</h1>
+        <p class="report-lead">本报告以政策关键词“数字经济”为检索对象，基于政策公开数据，系统呈现政策检索明细。关键指标包括：政策检索结果 96、政策类型数 1、高频主题词 5、最热主题 资金、覆盖月份 2。检索聚合仅使用当前页标题确认且按稳定字段去重的样本；正文命中仅保留为待复核线索，上游 total 原样保留，分布与趋势不作因果解释</p>
         <div class="abstract-box">报告涵盖查询对象、数据总览、核心分析、代表性记录与结构洞察，所有数据均标注口径与来源。</div>
-        <div class="biz-metrics"><div class="biz-metric"><span class="m-name">市级项目</span><span class="m-tag t-neutral">占 100%</span><span class="m-value">1</span></div><div class="biz-metric"><span class="m-name">政策检索结果</span><span class="m-tag"></span><span class="m-value">10000</span></div><div class="biz-metric"><span class="m-name">政策类型数</span><span class="m-tag"></span><span class="m-value">1</span></div><div class="biz-metric"><span class="m-name">高频主题词</span><span class="m-tag"></span><span class="m-value">5</span></div><div class="biz-metric"><span class="m-name">最热主题</span><span class="m-tag"></span><span class="m-value">资金</span></div><div class="biz-metric"><span class="m-name">覆盖月份</span><span class="m-tag"></span><span class="m-value">6</span></div><div class="biz-metric"><span class="m-name">发布机构数</span><span class="m-tag"></span><span class="m-value">10</span></div><div class="biz-metric-empty"></div></div>
-        <ul class="exec-list"><li>高阶（国家/省级）项目占比越高，企业承担重大专项、获得政府认可的能力越强；偏低则多以市区级普惠政策为主。</li><li>归口分布高度集中；高度集中意味着主要政策渠道稳定，分散则需对接多个部门，建议聚焦主力渠道深耕。</li><li>获批量上升反映政策红利期或企业申报能力增强；下降可能是政策窗口收窄或竞争加剧，需提前布局下一年度申报。</li><li>申报指南占比高意味当前有较多可申报机会；公示公开偏多则说明已有较多同类项目落地，竞争需评估。</li><li>命中量反映关键词与现行政策的关联广度；覆盖地区多说明政策适用范围广，可结合类型与机构筛选高价值政策。</li></ul>
-        <div class="cover-findings"><h3 class="cover-findings-title">核心发现</h3><div class="cover-findings-grid"><div class="finding-card"><p class="f-label">项目层级结构与高阶占比</p><p class="f-text">获批项目共 1 个，国家级+省级合计占 0%；最多为“市级”（100%）。</p></div><div class="finding-card"><p class="f-label">项目归口集中度</p><p class="f-text">“深圳市人力资源和社会保障局”获批项目占比约 100%，前 3 主管机构合计 100%（CR3）。</p></div><div class="finding-card"><p class="f-label">获批项目趋势</p><p class="f-text">峰值在“2020”（1 个），近年持平，。</p></div><div class="finding-card"><p class="f-label">政策类型结构</p><p class="f-text">检索政策中“其他政策”类占比约 100%，前 3 类合计 100%（CR3）。</p></div></div></div>
-        <div class="cover-dimensions"><span class="dim-label">分析维度</span><div class="dim-tags"><span class="dim-tag">立项项目统计</span><span class="dim-tag">项目层级分布</span><span class="dim-tag">项目归口分布</span><span class="dim-tag">获批项目趋势</span><span class="dim-tag">政策类型分布</span><span class="dim-tag">政策主题词频</span><span class="dim-tag">政策发布时间趋势</span><span class="dim-tag">政策检索明细</span></div></div>
-        <div class="cover-scope-bar"><span class="scope-item"><em>数据产品</em>政策检索、立项项目统计、政策详情</span><span class="scope-item"><em>覆盖范围</em>立项项目统计、政策检索明细、政策详情</span></div>
+        <div class="biz-metrics"><div class="biz-metric"><span class="m-name">政策检索结果</span><span class="m-tag"></span><span class="m-value">96</span></div><div class="biz-metric"><span class="m-name">政策类型数</span><span class="m-tag"></span><span class="m-value">1</span></div><div class="biz-metric"><span class="m-name">高频主题词</span><span class="m-tag"></span><span class="m-value">5</span></div><div class="biz-metric"><span class="m-name">最热主题</span><span class="m-tag"></span><span class="m-value">资金</span></div><div class="biz-metric"><span class="m-name">覆盖月份</span><span class="m-tag"></span><span class="m-value">2</span></div><div class="biz-metric"><span class="m-name">发布机构数</span><span class="m-tag"></span><span class="m-value">4</span></div><div class="biz-metric-empty"></div><div class="biz-metric-empty"></div></div>
+        <ul class="exec-list"><li>该比例仅描述当前页标题确认且去重样本的类型构成，不代表可申报机会数量、实施成效或竞争强度。</li><li>上游 total 未经本地相关性过滤；正文命中仅作为待复核线索，只能基于当前页标题确认样本做描述，不外推政策适用范围或价值。</li></ul>
+        <div class="cover-findings"><h3 class="cover-findings-title">核心发现</h3><div class="cover-findings-grid"><div class="finding-card"><p class="f-label">政策类型结构</p><p class="f-text">检索政策中“公示公开”类占比约 100%，前 3 类合计 100%（CR3）。</p></div><div class="finding-card"><p class="f-label">政策匹配广度</p><p class="f-text">上游返回 total=96；当前页标题确认且去重的样本 4 条，覆盖地区 4 个。</p></div></div></div>
+        <div class="cover-dimensions"><span class="dim-label">分析维度</span><div class="dim-tags"><span class="dim-tag">立项项目统计</span><span class="dim-tag">项目层级分布</span><span class="dim-tag">项目归口分布</span><span class="dim-tag">获批项目趋势</span><span class="dim-tag">政策类型分布</span><span class="dim-tag">政策主题词频</span><span class="dim-tag">政策发布时间趋势</span><span class="dim-tag">检索相关性校验</span><span class="dim-tag">政策检索明细</span></div></div>
+        <div class="cover-scope-bar"><span class="scope-item"><em>数据产品</em>政策检索</span><span class="scope-item"><em>覆盖范围</em>政策检索明细</span></div>
       </section>
     </div>
   </article>
   <main class="research-doc">
-    <section class="report-page biz-section"><div class="report-topbar"><div class="report-stripe"></div><div class="report-banner">政策大数据报告</div></div><div class="biz-section-head"><div><h2>报告摘要</h2><p class="biz-section-note">概述分析对象、数据覆盖范围与核心发现。</p></div><span class="biz-tag">Summary</span></div><p class="biz-summary">本报告以政策关键词“房地产”为检索对象，基于政策公开数据，系统呈现立项项目统计、项目归口分布、获批项目趋势、政策检索明细与政策详情。关键指标包括：市级项目 1、政策检索结果 10000。报告同时给出项目申报层级、归口集中度与申报活跃度的结构化解读，便于政策申报规划与政府扶持分析参考</p></section>
-    <section class="report-page biz-section"><div class="report-topbar"><div class="report-stripe"></div><div class="report-banner">政策大数据报告</div></div><div class="biz-section-head"><div><h2>查询对象与口径</h2><p class="biz-section-note">说明匹配对象、匹配方式与数据范围。</p></div><span class="biz-tag">Caliber</span></div><div class="info-list"><div class="info-row"><span class="info-label">匹配对象</span><span class="info-value">政策关键词“房地产” / 企业“恒大地产集团有限公司”</span></div><div class="info-row"><span class="info-label">匹配方式</span><span class="info-value">政策检索按政策关键词匹配（pnType=全部）；立项项目统计按企业主体“恒大地产集团有限公司”匹配</span></div><div class="info-row"><span class="info-label">数据范围</span><span class="info-value">立项项目统计、政策检索明细、政策详情</span></div><div class="info-row"><span class="info-label">局限说明</span><span class="info-value">数据来自政策公开数据库；少量字段可能存在更新延迟。</span></div></div></section>
-    <section class="report-page biz-section"><div class="report-topbar"><div class="report-stripe"></div><div class="report-banner">政策大数据报告</div></div><div class="biz-section-head"><div><h2>数据总览</h2><p class="biz-section-note">关键指标一览。</p></div><span class="biz-tag">Metrics</span></div><div class="biz-metrics"><div class="biz-metric"><span class="m-name">市级项目</span><span class="m-tag t-neutral">占 100%</span><span class="m-value">1</span></div><div class="biz-metric"><span class="m-name">政策检索结果</span><span class="m-tag"></span><span class="m-value">10000</span></div><div class="biz-metric"><span class="m-name">政策类型数</span><span class="m-tag"></span><span class="m-value">1</span></div><div class="biz-metric"><span class="m-name">高频主题词</span><span class="m-tag"></span><span class="m-value">5</span></div><div class="biz-metric"><span class="m-name">最热主题</span><span class="m-tag"></span><span class="m-value">资金</span></div><div class="biz-metric"><span class="m-name">覆盖月份</span><span class="m-tag"></span><span class="m-value">6</span></div><div class="biz-metric"><span class="m-name">发布机构数</span><span class="m-tag"></span><span class="m-value">10</span></div><div class="biz-metric-empty"></div></div></section>
-    <section class="report-page biz-section"><div class="report-topbar"><div class="report-stripe"></div><div class="report-banner">政策大数据报告</div></div><div class="biz-section-head"><div><h2>核心分析</h2><p class="biz-section-note">按维度展开目标核心数据与结构化明细。</p></div><span class="biz-tag">Analysis</span></div><h3 class="biz-subsection-title">立项项目统计</h3><div class="info-list"><div class="info-row"><span class="info-label">市级项目数</span><span class="info-value">1</span></div><div class="info-row"><span class="info-label">匹配企业</span><span class="info-value">恒大地产集团有限公司</span></div></div>
-<p class="biz-section-note">按申报层级（国家/省/市/区）统计获批项目占比</p><div class="chart-box"><h4 class="chart-title">项目层级分布</h4><div class="chart-canvas" data-chart="pie" data-spec="{&quot;type&quot;:&quot;pie&quot;,&quot;donut&quot;:true,&quot;data&quot;:[{&quot;name&quot;:&quot;市级&quot;,&quot;value&quot;:1.0}]}"></div><details class="chart-data"><summary>数据明细</summary><div class="table-wrap"><table><thead><tr><th>层级</th><th>项目数</th></tr></thead><tbody><tr><td>市级</td><td>1</td></tr></tbody></table></div></details></div>
-<p class="biz-section-note">按主管机构统计获批项目数量</p><div class="chart-box"><h4 class="chart-title">项目归口分布</h4><div class="chart-canvas" data-chart="bar" data-spec="{&quot;type&quot;:&quot;bar&quot;,&quot;orient&quot;:&quot;v&quot;,&quot;names&quot;:[&quot;深圳市人力资源和社会保障局&quot;],&quot;values&quot;:[1.0]}"></div><details class="chart-data"><summary>数据明细</summary><div class="table-wrap"><table><thead><tr><th>主管机构</th><th>项目数量</th></tr></thead><tbody><tr><td>深圳市人力资源和社会保障局</td><td>1</td></tr></tbody></table></div></details></div>
-<p class="biz-section-note">按年度统计获批项目数量</p><div class="chart-box"><h4 class="chart-title">获批项目趋势</h4><div class="chart-canvas" data-chart="line" data-spec="{&quot;type&quot;:&quot;line&quot;,&quot;area&quot;:true,&quot;x&quot;:[&quot;2020&quot;],&quot;series&quot;:[{&quot;name&quot;:&quot;获批项目趋势&quot;,&quot;data&quot;:[1.0]}]}"></div><details class="chart-data"><summary>数据明细</summary><div class="table-wrap"><table><thead><tr><th>年份</th><th>获批项目数</th></tr></thead><tbody><tr><td>2020</td><td>1</td></tr></tbody></table></div></details></div>
-<p class="biz-section-note">按政策类型统计检索命中数</p><div class="chart-box"><h4 class="chart-title">政策类型分布</h4><div class="chart-canvas" data-chart="pie" data-spec="{&quot;type&quot;:&quot;pie&quot;,&quot;donut&quot;:true,&quot;data&quot;:[{&quot;name&quot;:&quot;其他政策&quot;,&quot;value&quot;:10.0}]}"></div><details class="chart-data"><summary>数据明细</summary><div class="table-wrap"><table><thead><tr><th>政策类型</th><th>数量</th></tr></thead><tbody><tr><td>其他政策</td><td>10</td></tr></tbody></table></div></details></div>
-<p class="biz-section-note">对政策正文(pnText)中各子主题词出现次数统计（人才/资金/培训/产业/技术…）</p><div class="chart-box"><h4 class="chart-title">政策主题词频</h4><div class="chart-canvas" data-chart="bar" data-spec="{&quot;type&quot;:&quot;bar&quot;,&quot;orient&quot;:&quot;v&quot;,&quot;names&quot;:[&quot;资金&quot;,&quot;产业&quot;,&quot;平台&quot;,&quot;数据&quot;,&quot;安全&quot;],&quot;values&quot;:[3.0,1.0,1.0,1.0,1.0]}"></div><details class="chart-data"><summary>数据明细</summary><div class="table-wrap"><table><thead><tr><th>主题词</th><th>出现次数</th></tr></thead><tbody><tr><td>资金</td><td>3</td></tr><tr><td>产业</td><td>1</td></tr><tr><td>平台</td><td>1</td></tr><tr><td>数据</td><td>1</td></tr><tr><td>安全</td><td>1</td></tr></tbody></table></div></details></div>
-<p class="biz-section-note">按发布月份(pnPublishDate)统计政策数量</p><div class="chart-box"><h4 class="chart-title">政策发布时间趋势</h4><div class="chart-canvas" data-chart="line" data-spec="{&quot;type&quot;:&quot;line&quot;,&quot;area&quot;:true,&quot;x&quot;:[&quot;2026-08&quot;,&quot;2753-08&quot;,&quot;2762-08&quot;,&quot;2764-02&quot;,&quot;2926-03&quot;,&quot;2936-07&quot;],&quot;series&quot;:[{&quot;name&quot;:&quot;政策发布时间趋势&quot;,&quot;data&quot;:[5.0,1.0,1.0,1.0,1.0,1.0]}]}"></div><details class="chart-data"><summary>数据明细</summary><div class="table-wrap"><table><thead><tr><th>月份</th><th>政策数量</th></tr></thead><tbody><tr><td>2026-08</td><td>5</td></tr><tr><td>2753-08</td><td>1</td></tr><tr><td>2762-08</td><td>1</td></tr><tr><td>2764-02</td><td>1</td></tr><tr><td>2926-03</td><td>1</td></tr><tr><td>2936-07</td><td>1</td></tr></tbody></table></div></details></div>
-<h3 class="biz-subsection-title">政策检索明细</h3><p class="biz-section-note">本次检索命中 10000 条，展示前 10 条</p><div class="table-wrap"><table><thead><tr><th>政策标题</th><th>发布机构</th><th>地区</th><th>政策类型</th><th>发布日期</th></tr></thead><tbody><tr><td>内蒙古自治区地方税务局、建设厅转发国家税务总局、建设部关于土地增值税征收管理有关问题的通知</td><td>内蒙古自治区地方税务局、内蒙古建设厅</td><td>国家部委</td><td>其他政策</td><td>2936-07-04</td></tr><tr><td>内蒙古自治区地方税务局关于进一步加强土地增值税征收管理工作的通知</td><td>内蒙古自治区地方税务局</td><td>国家部委</td><td>其他政策</td><td>2926-03-04</td></tr><tr><td>内蒙古自治区财政厅、国家税务局地方税务局、国有资产管理局转发关于转让国有房地产征收土地增值税中有关房地产价格评估问题的通知</td><td>内蒙古自治区财政厅、国家税务局、地方税务局、国有资产管理局</td><td>国家部委</td><td>其他政策</td><td>2764-02-06</td></tr><tr><td>内蒙古自治区财政厅 国家税务局地方税务局转发关于土地增值税一些具体规定的通知</td><td>内蒙古自治区财政厅 国家税务局地方税务局</td><td>国家部委</td><td>其他政策</td><td>2762-08-10</td></tr><tr><td>内蒙古自治区人民政府办公厅关于贯彻实施土地增值税有关政策的通知</td><td>内蒙古自治区人民政府办公厅</td><td>国家部委</td><td>其他政策</td><td>2753-08-05</td></tr><tr><td>关于永济珑玺室外配套及外网工程农民工工资专用账户销户的公告</td><td>沧州市住房和城乡建设局</td><td>河北省、沧州市</td><td>其他政策</td><td>2026-08-10</td></tr><tr><td>广元市城市建筑垃圾产生核准信息公开表</td><td>广元市住房和城乡建设局</td><td>四川省、广元市</td><td>其他政策</td><td>2026-08-10</td></tr><tr><td>2026年第二批市区高校毕业生租房券申请及动态核查拟通过人员公告</td><td>镇江市住房和城乡建设局</td><td>江苏省、镇江市</td><td>其他政策</td><td>2026-08-10</td></tr><tr><td>【抽查结果】关于2026年上半年建筑市场行为“双随机、一公开”联合检查情况的公示</td><td>襄阳市住房和城乡建设局</td><td>湖北省</td><td>其他政策</td><td>2026-08-10</td></tr><tr><td>广宁县2026年上半年经济运行分析会议：攻坚冲刺三季度，奋力完成全年目标</td><td>广宁县发展和改革局</td><td>广东省、肇庆市、广宁县</td><td>其他政策</td><td>2026-08-07</td></tr></tbody></table></div></section>
-    <section class="report-page biz-section"><div class="report-topbar"><div class="report-stripe"></div><div class="report-banner">政策大数据报告</div></div><div class="biz-section-head"><div><h2>代表性记录</h2><p class="biz-section-note">关键明细记录 Top N。</p></div><span class="biz-tag">Records</span></div><div class="table-wrap"><table><thead><tr><th>政策标题</th><th>发布机构</th><th>政策类型</th><th>发布日期</th></tr></thead><tbody><tr><td>内蒙古自治区地方税务局、建设厅转发国家税务总局、建设部关于土地增值税征收管理有关问题的通知</td><td>内蒙古自治区地方税务局、内蒙古建设厅</td><td>其他政策</td><td>2936-07-04</td></tr><tr><td>内蒙古自治区地方税务局关于进一步加强土地增值税征收管理工作的通知</td><td>内蒙古自治区地方税务局</td><td>其他政策</td><td>2926-03-04</td></tr><tr><td>内蒙古自治区财政厅、国家税务局地方税务局、国有资产管理局转发关于转让国有房地产征收土地增值税中有关房地产价格评估问题的通知</td><td>内蒙古自治区财政厅、国家税务局、地方税务局、国有资产管理局</td><td>其他政策</td><td>2764-02-06</td></tr><tr><td>内蒙古自治区财政厅 国家税务局地方税务局转发关于土地增值税一些具体规定的通知</td><td>内蒙古自治区财政厅 国家税务局地方税务局</td><td>其他政策</td><td>2762-08-10</td></tr><tr><td>内蒙古自治区人民政府办公厅关于贯彻实施土地增值税有关政策的通知</td><td>内蒙古自治区人民政府办公厅</td><td>其他政策</td><td>2753-08-05</td></tr><tr><td>关于永济珑玺室外配套及外网工程农民工工资专用账户销户的公告</td><td>沧州市住房和城乡建设局</td><td>其他政策</td><td>2026-08-10</td></tr><tr><td>广元市城市建筑垃圾产生核准信息公开表</td><td>广元市住房和城乡建设局</td><td>其他政策</td><td>2026-08-10</td></tr><tr><td>2026年第二批市区高校毕业生租房券申请及动态核查拟通过人员公告</td><td>镇江市住房和城乡建设局</td><td>其他政策</td><td>2026-08-10</td></tr><tr><td>【抽查结果】关于2026年上半年建筑市场行为“双随机、一公开”联合检查情况的公示</td><td>襄阳市住房和城乡建设局</td><td>其他政策</td><td>2026-08-10</td></tr><tr><td>广宁县2026年上半年经济运行分析会议：攻坚冲刺三季度，奋力完成全年目标</td><td>广宁县发展和改革局</td><td>其他政策</td><td>2026-08-07</td></tr></tbody></table></div></section>
+    <section class="report-page biz-section"><div class="report-topbar"><div class="report-stripe"></div><div class="report-banner">政策大数据报告</div></div><div class="biz-section-head"><div><h2>报告摘要</h2><p class="biz-section-note">概述分析对象、数据覆盖范围与核心发现。</p></div><span class="biz-tag">Summary</span></div><p class="biz-summary">本报告以政策关键词“数字经济”为检索对象，基于政策公开数据，系统呈现政策检索明细。关键指标包括：政策检索结果 96、政策类型数 1、高频主题词 5、最热主题 资金、覆盖月份 2。检索聚合仅使用当前页标题确认且按稳定字段去重的样本；正文命中仅保留为待复核线索，上游 total 原样保留，分布与趋势不作因果解释</p></section>
+    <section class="report-page biz-section"><div class="report-topbar"><div class="report-stripe"></div><div class="report-banner">政策大数据报告</div></div><div class="biz-section-head"><div><h2>查询对象与口径</h2><p class="biz-section-note">说明匹配对象、匹配方式与数据范围。</p></div><span class="biz-tag">Caliber</span></div><div class="info-list"><div class="info-row"><span class="info-label">匹配对象</span><span class="info-value">政策关键词“数字经济”</span></div><div class="info-row"><span class="info-label">匹配方式</span><span class="info-value">政策检索按政策关键词匹配（pnType=公示公开）</span></div><div class="info-row"><span class="info-label">数据范围</span><span class="info-value">政策检索明细</span></div><div class="info-row"><span class="info-label">局限说明</span><span class="info-value">数据来自政策公开数据库；少量字段可能存在更新延迟。</span></div></div></section>
+    <section class="report-page biz-section"><div class="report-topbar"><div class="report-stripe"></div><div class="report-banner">政策大数据报告</div></div><div class="biz-section-head"><div><h2>数据总览</h2><p class="biz-section-note">关键指标一览。</p></div><span class="biz-tag">Metrics</span></div><div class="biz-metrics"><div class="biz-metric"><span class="m-name">政策检索结果</span><span class="m-tag"></span><span class="m-value">96</span></div><div class="biz-metric"><span class="m-name">政策类型数</span><span class="m-tag"></span><span class="m-value">1</span></div><div class="biz-metric"><span class="m-name">高频主题词</span><span class="m-tag"></span><span class="m-value">5</span></div><div class="biz-metric"><span class="m-name">最热主题</span><span class="m-tag"></span><span class="m-value">资金</span></div><div class="biz-metric"><span class="m-name">覆盖月份</span><span class="m-tag"></span><span class="m-value">2</span></div><div class="biz-metric"><span class="m-name">发布机构数</span><span class="m-tag"></span><span class="m-value">4</span></div><div class="biz-metric-empty"></div><div class="biz-metric-empty"></div></div></section>
+    <section class="report-page biz-section"><div class="report-topbar"><div class="report-stripe"></div><div class="report-banner">政策大数据报告</div></div><div class="biz-section-head"><div><h2>核心分析</h2><p class="biz-section-note">按维度展开目标核心数据与结构化明细。</p></div><span class="biz-tag">Analysis</span></div><p class="biz-section-note">仅按标题确认且去重的当前页样本统计政策类型</p><div class="chart-box"><h4 class="chart-title">政策类型分布</h4><div class="chart-canvas" data-chart="pie" data-spec="{&quot;type&quot;:&quot;pie&quot;,&quot;donut&quot;:true,&quot;data&quot;:[{&quot;name&quot;:&quot;公示公开&quot;,&quot;value&quot;:4.0}]}"></div><details class="chart-data"><summary>数据明细</summary><div class="table-wrap"><table><thead><tr><th>政策类型</th><th>数量</th></tr></thead><tbody><tr><td>公示公开</td><td>4</td></tr></tbody></table></div></details></div>
+<p class="biz-section-note">仅对标题确认且去重样本的正文(pnText)做子主题词统计</p><div class="chart-box"><h4 class="chart-title">政策主题词频</h4><div class="chart-canvas" data-chart="bar" data-spec="{&quot;type&quot;:&quot;bar&quot;,&quot;orient&quot;:&quot;v&quot;,&quot;names&quot;:[&quot;资金&quot;,&quot;产业&quot;,&quot;创新&quot;,&quot;数据&quot;,&quot;技术&quot;],&quot;values&quot;:[10.0,6.0,4.0,2.0,1.0]}"></div><details class="chart-data"><summary>数据明细</summary><div class="table-wrap"><table><thead><tr><th>主题词</th><th>出现次数</th></tr></thead><tbody><tr><td>资金</td><td>10</td></tr><tr><td>产业</td><td>6</td></tr><tr><td>创新</td><td>4</td></tr><tr><td>数据</td><td>2</td></tr><tr><td>技术</td><td>1</td></tr></tbody></table></div></details></div>
+<p class="biz-section-note">仅按标题确认且去重样本的发布月份统计</p><div class="chart-box"><h4 class="chart-title">政策发布时间趋势</h4><div class="chart-canvas" data-chart="line" data-spec="{&quot;type&quot;:&quot;line&quot;,&quot;area&quot;:true,&quot;x&quot;:[&quot;2025-10&quot;,&quot;2025-11&quot;],&quot;series&quot;:[{&quot;name&quot;:&quot;政策发布时间趋势&quot;,&quot;data&quot;:[2.0,2.0]}]}"></div><details class="chart-data"><summary>数据明细</summary><div class="table-wrap"><table><thead><tr><th>月份</th><th>政策数量</th></tr></thead><tbody><tr><td>2025-10</td><td>2</td></tr><tr><td>2025-11</td><td>2</td></tr></tbody></table></div></details></div>
+<h3 class="biz-subsection-title">检索相关性校验</h3><div class="info-list"><div class="info-row"><span class="info-label">上游总数</span><span class="info-value">96</span></div><div class="info-row"><span class="info-label">当前页样本数</span><span class="info-value">10</span></div><div class="info-row"><span class="info-label">标题确认样本数（含重复）</span><span class="info-value">4</span></div><div class="info-row"><span class="info-label">标题确认去重样本数</span><span class="info-value">4</span></div><div class="info-row"><span class="info-label">正文线索样本数</span><span class="info-value">6</span></div><div class="info-row"><span class="info-label">未命中样本数</span><span class="info-value">0</span></div><div class="info-row"><span class="info-label">重复样本数</span><span class="info-value">0</span></div></div>
+<h3 class="biz-subsection-title">政策检索明细</h3><p class="biz-section-note">上游命中 96 条；当前页 10 条，标题确认相关去重样本 4 条</p><div class="table-wrap"><table><thead><tr><th>政策标题</th><th>发布机构</th><th>地区</th><th>政策类型</th><th>发布日期</th><th>相关性</th><th>命中位置</th><th>重复标记</th></tr></thead><tbody><tr><td>2026年漳州市第五批福建省高层次人才拟认定人选名单公示</td><td>漳州市人力资源和社会保障局</td><td>福建省、漳州市</td><td>公示公开</td><td>2026-09-14</td><td>正文线索</td><td>正文</td><td>-</td></tr><tr><td>2026年漳州市第四批福建省高层次人才拟认定人选名单公示</td><td>漳州市人力资源和社会保障局</td><td>福建省、漳州市</td><td>公示公开</td><td>2026-09-10</td><td>正文线索</td><td>正文</td><td>-</td></tr><tr><td>关于2026年“春蕾计划——圆梦行动”拟申报资助候选名单公示</td><td>福州市人民政府</td><td>福建省、福州市</td><td>公示公开</td><td>2026-08-10</td><td>正文线索</td><td>正文</td><td>-</td></tr><tr><td>2025年拟确认泉州市专精特新园区名单公示</td><td>泉州市工业和信息化局</td><td>福建省、泉州市</td><td>公示公开</td><td>2025-12-08</td><td>正文线索</td><td>正文</td><td>-</td></tr><tr><td>厦门火炬高新区管委会关于拟安排2025年度数字经济政策第三批次申报项目资金兑现的公示</td><td>厦门火炬高新区管委会</td><td>福建省、厦门市、火炬高新区</td><td>公示公开</td><td>2025-11-18</td><td>标题确认</td><td>标题+正文</td><td>-</td></tr><tr><td>关于再次落实拟兑现2024年度《漳州市加快数字经济产业发展若干措施》资金奖补企业名单的公示</td><td>漳州市发展和改革委员会</td><td>福建省、漳州市</td><td>公示公开</td><td>2025-11-06</td><td>标题确认</td><td>标题+正文</td><td>-</td></tr><tr><td>2025年市级工业数字经济发展专项资金拟补助名单公示</td><td>泉州市工业和信息化局</td><td>福建省、泉州市</td><td>公示公开</td><td>2025-10-30</td><td>标题确认</td><td>标题+正文</td><td>-</td></tr><tr><td>厦门火炬高新区管委会关于拟安排2025年度数字经济政策第二批次申报项目资金兑现的公示</td><td>厦门市火炬高技术产业开发区管理委员会</td><td>福建省、厦门市、厦门火炬高新区</td><td>公示公开</td><td>2025-10-22</td><td>标题确认</td><td>标题+正文</td><td>-</td></tr><tr><td>关于2025年厦门市劳动模范集体、劳动模范和先进工作者推荐对象的公示</td><td>厦门市思明区人民政府办公室</td><td>福建省、厦门市、思明区</td><td>公示公开</td><td>2025-09-08</td><td>正文线索</td><td>正文</td><td>-</td></tr><tr><td>名单公示 | 2025年漳州市核心产业领域“独角兽”“未来独角兽”“瞪羚”和“准瞪羚”拟认定企业名单</td><td>漳州市发展和改革委员会</td><td>福建省、漳州市</td><td>公示公开</td><td>2025-09-02</td><td>正文线索</td><td>正文</td><td>-</td></tr></tbody></table></div></section>
+    <section class="report-page biz-section"><div class="report-topbar"><div class="report-stripe"></div><div class="report-banner">政策大数据报告</div></div><div class="biz-section-head"><div><h2>代表性记录</h2><p class="biz-section-note">关键明细记录 Top N。</p></div><span class="biz-tag">Records</span></div><div class="table-wrap"><table><thead><tr><th>政策标题</th><th>发布机构</th><th>政策类型</th><th>发布日期</th><th>相关性</th><th>重复标记</th></tr></thead><tbody><tr><td>2026年漳州市第五批福建省高层次人才拟认定人选名单公示</td><td>漳州市人力资源和社会保障局</td><td>公示公开</td><td>2026-09-14</td><td>正文线索</td><td>-</td></tr><tr><td>2026年漳州市第四批福建省高层次人才拟认定人选名单公示</td><td>漳州市人力资源和社会保障局</td><td>公示公开</td><td>2026-09-10</td><td>正文线索</td><td>-</td></tr><tr><td>关于2026年“春蕾计划——圆梦行动”拟申报资助候选名单公示</td><td>福州市人民政府</td><td>公示公开</td><td>2026-08-10</td><td>正文线索</td><td>-</td></tr><tr><td>2025年拟确认泉州市专精特新园区名单公示</td><td>泉州市工业和信息化局</td><td>公示公开</td><td>2025-12-08</td><td>正文线索</td><td>-</td></tr><tr><td>厦门火炬高新区管委会关于拟安排2025年度数字经济政策第三批次申报项目资金兑现的公示</td><td>厦门火炬高新区管委会</td><td>公示公开</td><td>2025-11-18</td><td>标题确认</td><td>-</td></tr><tr><td>关于再次落实拟兑现2024年度《漳州市加快数字经济产业发展若干措施》资金奖补企业名单的公示</td><td>漳州市发展和改革委员会</td><td>公示公开</td><td>2025-11-06</td><td>标题确认</td><td>-</td></tr><tr><td>2025年市级工业数字经济发展专项资金拟补助名单公示</td><td>泉州市工业和信息化局</td><td>公示公开</td><td>2025-10-30</td><td>标题确认</td><td>-</td></tr><tr><td>厦门火炬高新区管委会关于拟安排2025年度数字经济政策第二批次申报项目资金兑现的公示</td><td>厦门市火炬高技术产业开发区管理委员会</td><td>公示公开</td><td>2025-10-22</td><td>标题确认</td><td>-</td></tr><tr><td>关于2025年厦门市劳动模范集体、劳动模范和先进工作者推荐对象的公示</td><td>厦门市思明区人民政府办公室</td><td>公示公开</td><td>2025-09-08</td><td>正文线索</td><td>-</td></tr><tr><td>名单公示 | 2025年漳州市核心产业领域“独角兽”“未来独角兽”“瞪羚”和“准瞪羚”拟认定企业名单</td><td>漳州市发展和改革委员会</td><td>公示公开</td><td>2025-09-02</td><td>正文线索</td><td>-</td></tr></tbody></table></div></section>
     <section class="report-page biz-section"><div class="report-topbar"><div class="report-stripe"></div><div class="report-banner">政策大数据报告</div></div><div class="biz-section-head"><div><h2>特征与洞察</h2><p class="biz-section-note">基于数据的结构化解读。</p></div><span class="biz-tag">Insights</span></div><div class="structural-feature-grid"><article class="structural-feature-card">
-  <h3>项目层级结构与高阶占比</h3>
-  <p class="structural-evidence">获批项目共 1 个，国家级+省级合计占 0%；最多为“市级”（100%）。</p>
-  <p>高阶（国家/省级）项目占比越高，企业承担重大专项、获得政府认可的能力越强；偏低则多以市区级普惠政策为主。</p>
-</article><article class="structural-feature-card">
-  <h3>项目归口集中度</h3>
-  <p class="structural-evidence">“深圳市人力资源和社会保障局”获批项目占比约 100%，前 3 主管机构合计 100%（CR3）。</p>
-  <p>归口分布高度集中；高度集中意味着主要政策渠道稳定，分散则需对接多个部门，建议聚焦主力渠道深耕。</p>
-</article><article class="structural-feature-card">
-  <h3>获批项目趋势</h3>
-  <p class="structural-evidence">峰值在“2020”（1 个），近年持平，。</p>
-  <p>获批量上升反映政策红利期或企业申报能力增强；下降可能是政策窗口收窄或竞争加剧，需提前布局下一年度申报。</p>
-</article><article class="structural-feature-card">
   <h3>政策类型结构</h3>
-  <p class="structural-evidence">检索政策中“其他政策”类占比约 100%，前 3 类合计 100%（CR3）。</p>
-  <p>申报指南占比高意味当前有较多可申报机会；公示公开偏多则说明已有较多同类项目落地，竞争需评估。</p>
+  <p class="structural-evidence">检索政策中“公示公开”类占比约 100%，前 3 类合计 100%（CR3）。</p>
+  <p>该比例仅描述当前页标题确认且去重样本的类型构成，不代表可申报机会数量、实施成效或竞争强度。</p>
 </article><article class="structural-feature-card">
   <h3>政策匹配广度</h3>
-  <p class="structural-evidence">按关键词“房地产”检索命中政策 10000 条，覆盖地区 6 个。</p>
-  <p>命中量反映关键词与现行政策的关联广度；覆盖地区多说明政策适用范围广，可结合类型与机构筛选高价值政策。</p>
+  <p class="structural-evidence">上游返回 total=96；当前页标题确认且去重的样本 4 条，覆盖地区 4 个。</p>
+  <p>上游 total 未经本地相关性过滤；正文命中仅作为待复核线索，只能基于当前页标题确认样本做描述，不外推政策适用范围或价值。</p>
 </article></div></section>
     <section class="report-page biz-section"><div class="report-topbar"><div class="report-stripe"></div><div class="report-banner">政策大数据报告</div></div><div class="biz-section-head"><div><h2>名词解释</h2><p class="biz-section-note">报告中涉及的专业术语与统计指标说明。</p></div><span class="biz-tag">Glossary</span></div><div class="glossary-list"><div class="glossary-row"><span class="glossary-term">CR3</span><span class="glossary-def">行业集中度指标（Concentration Ratio 3），指排名前 3 的类别合计占总量的百分比。CR3 越高说明分布越集中，反之越分散。常用于衡量城市、品牌、产品类型等的集中程度。</span></div></div></section>
   </main>

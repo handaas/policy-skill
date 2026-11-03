@@ -1,0 +1,183 @@
+{
+  "schema_version": 1,
+  "skill": "policy-skill",
+  "case_id": "04-enterprise-approved-projects",
+  "title": "企业获批项目与政策联动",
+  "invocation_id": "1793070077533362000",
+  "provenance": {
+    "integrator_id": "683e574805537ace146cc05e",
+    "runner_sha256": "05777c2f2b0791cb5157aef691206606dade8df7af3b17212285b7ae74632a66",
+    "credential_policy_sha256": "bcabf08a1ca92f28357c0e57a8bae9bfa910eb1d4b204d8195ee3b7a77106eed",
+    "scenario_sha256": "22176f12549ecaab69349e276262ed72b03f830e364a9383795a7340fad35928",
+    "skill_source_hashes": {
+      "scripts/common.py": "e3bddaa56284efe9e963bb8fd9749a13afec7a37b4355daf3d902251243680b5",
+      "scripts/compose_report.py": "37c32c6fea05e82cbe175b656be2a7e59dd268dae9eb01227e1c17ccf45a82ba",
+      "scripts/mcp_client.py": "032ebb6a99427031f65d03c9588fe7c32ce8064e0a5480ac6bd1918a914c5c0e",
+      "scripts/render_report.py": "0c638b43ffc6410ef4cda94ee51d3e50dc83dea9d32de20ef0521cf9ee4e2cfe",
+      "scripts/validate_config.py": "c146c2ad5a121483dc5a638f6d393ef0a5eb10904bb15305b02a435c9d28cece"
+    },
+    "upstream_source_hashes": {
+      "policy-mcp-server": "298984f4dbd1f7a39fa3a4fde6e1c7fff11acce6242dd61c35779b7f277ba179"
+    },
+    "upstream_dependency_hashes": {
+      "policy-mcp-server/server/mcp_server.py": "298984f4dbd1f7a39fa3a4fde6e1c7fff11acce6242dd61c35779b7f277ba179"
+    }
+  },
+  "source_changed_during_run": false,
+  "started_at": "2026-10-27T11:01:17+08:00",
+  "elapsed_seconds": 3.111,
+  "returncode": 0,
+  "exception_type": null,
+  "command": "python3 policy-skill/scripts/compose_report.py --keyword '科技创新' --enterprise '华为技术有限公司' --page-size 10 --output policy-skill/output/live-replaced-20261027/04-enterprise-approved-projects/report.json --report-output policy-skill/output/live-replaced-20261027/04-enterprise-approved-projects/report.html",
+  "transport": "local MCP servers via loopback streamable-http",
+  "cache_used": false,
+  "call_count": 2,
+  "successful_data_calls": 2,
+  "empty_calls": 0,
+  "failed_calls": 0,
+  "checks": {
+    "issues": [],
+    "warnings": [],
+    "coverage_pct": 100,
+    "subject": {
+      "keyword": "科技创新",
+      "matchKeyword": "科技创新",
+      "enterprise": "华为技术有限公司",
+      "enterprise_input": "华为技术有限公司",
+      "enterprise_resolved": true,
+      "enterprise_resolve_reason": "视为企业全称",
+      "enterprise_blocked_reason": "",
+      "pn_type": "全部",
+      "agency": "",
+      "address": "",
+      "policy_id": ""
+    },
+    "title": "“科技创新” 政策大数据报告",
+    "data_mode": null,
+    "metrics": [
+      {
+        "label": "国家级项目",
+        "value": "13",
+        "hint": "获批国家级项目数量",
+        "delta": "占 21%"
+      },
+      {
+        "label": "省级项目",
+        "value": "14",
+        "hint": "获批省级项目数量",
+        "delta": "占 23%"
+      },
+      {
+        "label": "市级项目",
+        "value": "20",
+        "hint": "获批市级项目数量",
+        "delta": "占 32%"
+      },
+      {
+        "label": "区级项目",
+        "value": "15",
+        "hint": "获批区级项目数量",
+        "delta": "占 24%"
+      },
+      {
+        "label": "政策检索结果",
+        "value": "10000",
+        "hint": "本次政策检索命中条数"
+      },
+      {
+        "label": "政策类型数",
+        "value": "3",
+        "hint": "涉及的政策类型数"
+      },
+      {
+        "label": "高频主题词",
+        "value": "3",
+        "hint": "出现频次较高的主题词数"
+      },
+      {
+        "label": "最热主题",
+        "value": "创新",
+        "hint": "出现频次最高的主题词"
+      },
+      {
+        "label": "覆盖月份",
+        "value": "1",
+        "hint": "有政策发布的月份数"
+      },
+      {
+        "label": "发布机构数",
+        "value": "4",
+        "hint": "涉及的政策发布机构数"
+      }
+    ],
+    "quality_report": {
+      "total_sections": 9,
+      "populated_sections": 9,
+      "empty_sections": 0,
+      "coverage_pct": 100
+    },
+    "unregistered_tools": [],
+    "checks": {
+      "json_html_markdown": true,
+      "explicit_live": true,
+      "tool_calls_recorded": 2,
+      "offline_scripts": true,
+      "independent_rerender": true,
+      "offline_browser": true
+    }
+  },
+  "status": "passed",
+  "source_hashes": {
+    "scripts/common.py": "e3bddaa56284efe9e963bb8fd9749a13afec7a37b4355daf3d902251243680b5",
+    "scripts/compose_report.py": "37c32c6fea05e82cbe175b656be2a7e59dd268dae9eb01227e1c17ccf45a82ba",
+    "scripts/mcp_client.py": "032ebb6a99427031f65d03c9588fe7c32ce8064e0a5480ac6bd1918a914c5c0e",
+    "scripts/render_report.py": "0c638b43ffc6410ef4cda94ee51d3e50dc83dea9d32de20ef0521cf9ee4e2cfe",
+    "scripts/validate_config.py": "c146c2ad5a121483dc5a638f6d393ef0a5eb10904bb15305b02a435c9d28cece"
+  },
+  "technical_status": "passed",
+  "audited_at": "2026-10-27T11:13:02+08:00",
+  "evidence_binding": {
+    "report.json": "722eab5c9caf03a71379fec72626cd72ce37cc7ba5a9b3e856048a7b960aeefe",
+    "report.html": "e0f8ff50c17ab4adf5e1801965f680e133e8ec5337d0cbda6853b24161add833",
+    "report.md": "5a6f35adea6334a9f64bba12cda862b0d4f9faa22543b99bbb6697b00ce85503",
+    "calls.json": "ccc59899997e4b04f1d8d250b45f1b56d6e63e1487e3d165671a0aea23362905",
+    "result.json": "d6868657d2b61a0e0376d77fa28859b0e1a8e8b8f97726584c03957f73470597",
+    "source_manifest_sha256": "014e0c39ccd221d4b037bfafc75dc705b73521da54c003be18fa8ca62d4dab92"
+  },
+  "business_review": {
+    "id": "04-enterprise-approved-projects",
+    "verdict": "acceptable",
+    "summary": "当前真实产物逐项复核通过；结论限于本次上游公开样本与报告声明口径。",
+    "checks": [
+      {
+        "expectation": "企业主体与政策关键词分开记录",
+        "status": "pass",
+        "evidence": "已证明“企业主体与政策关键词分开记录”。 实际调用=[{\"tool\":\"policy_bigdata_policy_search\",\"status\":\"data\",\"row_count\":10,\"reported_total\":10000,\"arguments\":{\"matchKeyword\":\"科技创新\",\"pnType\":\"全部\",\"pageIndex\":1,\"pageSize\":10}},{\"tool\":\"policy_bigdata_approved_project_stats\",\"status\":\"data\",\"row_count\":null,\"reported_total\":null,\"arguments\":{\"matchKeyword\":\"华为技术有限公司\",\"keywordType\":\"name\"}}] subject={\"keyword\":\"科技创新\",\"matchKeyword\":\"科技创新\",\"enterprise\":\"华为技术有限公司\",\"enterprise_input\":\"华为技术有限公司\",\"enterprise_resolved\":true,\"enterprise_resolve_reason\":\"视为企业全称\",\"enterprise_blocked_reason\":\"\",\"pn_type\":\"全部\",\"agency\":\"\",\"address\":\"\",\"policy_id\":\"\"} 口径={\"match_target\":\"政策关键词“科技创新” / 企业“华为技术有限公司”\",\"match_type\":\"政策检索按政策关键词匹配（pnType=全部）；立项项目统计按企业主体“华为技术有限公司”匹配\",\"data_scope\":\"政策检索明细、立项项目统计\",\"products\":[\"政策检索\",\"立项项目统计\"],\"limit\":\"数据来自政策公开数据库；少量字段可能存在更新延迟。\"} 实际记录样本={\"level_dist\":[{\"层级\":\"国家级\",\"项目数\":\"13\"},{\"层级\":\"省级\",\"项目数\":\"14\"}],\"agency_stat\":[{\"主管机构\":\"中华人民共和国国家发展和改革委员会\",\"项目数量\":\"1\"},{\"主管机构\":\"中国质量协会\",\"项目数量\":\"1\"}],\"year_project_stat\":[{\"年份\":\"2019\",\"获批项目数\":\"9\"},{\"年份\":\"2020\",\"获批项目数\":\"7\"}],\"type_dist\":[{\"政策类型\":\"申报指南\",\"数量\":\"3\"},{\"政策类型\":\"其他政策\",\"数量\":\"1\"}],\"keyword_freq\":[{\"主题词\":\"创新\",\"出现次数\":\"11\"},{\"主题词\":\"技术\",\"出现次数\":\"9\"}],\"monthly_trend\":[{\"月份\":\"2026-10\",\"政策数量\":\"5\"}],\"search_records\":[{\"政策标题\":\"深圳市科技创新局关于发布《2026年深圳鲲鹏青年创业项目申请指南》的通知\",\"发布机构\":\"罗湖区企业服务中心\",\"地区\":\"广东省、深圳市、罗湖区\",\"政策类型\":\"其他政策\",\"发布日期\":\"2026-10-26\",\"相关性\":\"标题确认\",\"命中位置\":\"标题+正文\",\"重复标记\":\"-\"},{\"政策标题\":\"深圳市科技创新局关于组织开展大型科研仪器实验人员技术课程的通知\",\"发布机构\":\"深圳市科技创新委员会\",\"地区\":\"广东省、深圳市\",\"政策类型\":\"申报指南\",\"发布日期\":\"2026-10-26\",\"相关性\":\"标题确认\",\"命中位置\":\"标题+正文\",\"重复标记\":\"-\"}]} 可见章节=[{\"title\":\"立项项目统计\",\"note\":null},{\"title\":\"项目层级分布\",\"note\":\"按申报层级（国家/省/市/区）统计获批项目占比\"},{\"title\":\"项目归口分布\",\"note\":\"按主管机构统计获批项目数量\"},{\"title\":\"获批项目趋势\",\"note\":\"按年度统计获批项目数量\"},{\"title\":\"政策类型分布\",\"note\":\"仅按标题确认且去重的当前页样本统计政策类型\"},{\"title\":\"政策主题词频\",\"note\":\"仅对标题确认且去重样本的正文(pnText)做子主题词统计\"},{\"title\":\"政策发布时间趋势\",\"note\":\"仅按标题确认且去重样本的发布月份统计\"},{\"title\":\"检索相关性校验\",\"note\":\"保留上游 total；主题聚合仅使用标题确认且按标题+机构+日期去重的当前页样本，正文命中仅作线索\"},{\"title\":\"政策检索明细\",\"note\":\"上游命中 10000 条；当前页 10 条，标题确认相关去重样本 5 条\"}]"
+      },
+      {
+        "expectation": "获批项目统计只来自企业维度数据",
+        "status": "pass",
+        "evidence": "已证明“获批项目统计只来自企业维度数据”。 实际记录样本={\"level_dist\":[{\"层级\":\"国家级\",\"项目数\":\"13\"},{\"层级\":\"省级\",\"项目数\":\"14\"}],\"agency_stat\":[{\"主管机构\":\"中华人民共和国国家发展和改革委员会\",\"项目数量\":\"1\"},{\"主管机构\":\"中国质量协会\",\"项目数量\":\"1\"}],\"year_project_stat\":[{\"年份\":\"2019\",\"获批项目数\":\"9\"},{\"年份\":\"2020\",\"获批项目数\":\"7\"}],\"type_dist\":[{\"政策类型\":\"申报指南\",\"数量\":\"3\"},{\"政策类型\":\"其他政策\",\"数量\":\"1\"}],\"keyword_freq\":[{\"主题词\":\"创新\",\"出现次数\":\"11\"},{\"主题词\":\"技术\",\"出现次数\":\"9\"}],\"monthly_trend\":[{\"月份\":\"2026-10\",\"政策数量\":\"5\"}],\"search_records\":[{\"政策标题\":\"深圳市科技创新局关于发布《2026年深圳鲲鹏青年创业项目申请指南》的通知\",\"发布机构\":\"罗湖区企业服务中心\",\"地区\":\"广东省、深圳市、罗湖区\",\"政策类型\":\"其他政策\",\"发布日期\":\"2026-10-26\",\"相关性\":\"标题确认\",\"命中位置\":\"标题+正文\",\"重复标记\":\"-\"},{\"政策标题\":\"深圳市科技创新局关于组织开展大型科研仪器实验人员技术课程的通知\",\"发布机构\":\"深圳市科技创新委员会\",\"地区\":\"广东省、深圳市\",\"政策类型\":\"申报指南\",\"发布日期\":\"2026-10-26\",\"相关性\":\"标题确认\",\"命中位置\":\"标题+正文\",\"重复标记\":\"-\"}]} 可见章节=[{\"title\":\"立项项目统计\",\"note\":null},{\"title\":\"项目层级分布\",\"note\":\"按申报层级（国家/省/市/区）统计获批项目占比\"},{\"title\":\"项目归口分布\",\"note\":\"按主管机构统计获批项目数量\"},{\"title\":\"获批项目趋势\",\"note\":\"按年度统计获批项目数量\"},{\"title\":\"政策类型分布\",\"note\":\"仅按标题确认且去重的当前页样本统计政策类型\"},{\"title\":\"政策主题词频\",\"note\":\"仅对标题确认且去重样本的正文(pnText)做子主题词统计\"},{\"title\":\"政策发布时间趋势\",\"note\":\"仅按标题确认且去重样本的发布月份统计\"},{\"title\":\"检索相关性校验\",\"note\":\"保留上游 total；主题聚合仅使用标题确认且按标题+机构+日期去重的当前页样本，正文命中仅作线索\"},{\"title\":\"政策检索明细\",\"note\":\"上游命中 10000 条；当前页 10 条，标题确认相关去重样本 5 条\"}]"
+      },
+      {
+        "expectation": "国家省市区层级数量不被重复相加",
+        "status": "pass",
+        "evidence": "已证明“国家省市区层级数量不被重复相加”。 当前事实={\"technical_status\":\"passed\",\"successful_data_calls\":2,\"calls\":[{\"tool\":\"policy_bigdata_policy_search\",\"status\":\"data\",\"row_count\":10,\"reported_total\":10000,\"arguments\":{\"matchKeyword\":\"科技创新\",\"pnType\":\"全部\",\"pageIndex\":1,\"pageSize\":10}},{\"tool\":\"policy_bigdata_approved_project_stats\",\"status\":\"data\",\"row_count\":null,\"reported_total\":null,\"arguments\":{\"matchKeyword\":\"华为技术有限公司\",\"keywordType\":\"name\"}}],\"quality\":{\"total_sections\":9,\"populated_sections\":9,\"empty_sections\":0,\"coverage_pct\":100},\"sections\":[{\"title\":\"立项项目统计\",\"note\":null},{\"title\":\"项目层级分布\",\"note\":\"按申报层级（国家/省/市/区）统计获批项目占比\"},{\"title\":\"项目归口分布\",\"note\":\"按主管机构统计获批项目数量\"},{\"title\":\"获批项目趋势\",\"note\":\"按年度统计获批项目数量\"},{\"title\":\"政策类型分布\",\"note\":\"仅按标题确认且去重的当前页样本统计政策类型\"}…"
+      },
+      {
+        "expectation": "政策检索与历史获批项目不建立无证据因果",
+        "status": "pass",
+        "evidence": "已证明“政策检索与历史获批项目不建立无证据因果”。 实际调用=[{\"tool\":\"policy_bigdata_policy_search\",\"status\":\"data\",\"row_count\":10,\"reported_total\":10000,\"arguments\":{\"matchKeyword\":\"科技创新\",\"pnType\":\"全部\",\"pageIndex\":1,\"pageSize\":10}},{\"tool\":\"policy_bigdata_approved_project_stats\",\"status\":\"data\",\"row_count\":null,\"reported_total\":null,\"arguments\":{\"matchKeyword\":\"华为技术有限公司\",\"keywordType\":\"name\"}}] subject={\"keyword\":\"科技创新\",\"matchKeyword\":\"科技创新\",\"enterprise\":\"华为技术有限公司\",\"enterprise_input\":\"华为技术有限公司\",\"enterprise_resolved\":true,\"enterprise_resolve_reason\":\"视为企业全称\",\"enterprise_blocked_reason\":\"\",\"pn_type\":\"全部\",\"agency\":\"\",\"address\":\"\",\"policy_id\":\"\"} 口径={\"match_target\":\"政策关键词“科技创新” / 企业“华为技术有限公司”\",\"match_type\":\"政策检索按政策关键词匹配（pnType=全部）；立项项目统计按企业主体“华为技术有限公司”匹配\",\"data_scope\":\"政策检索明细、立项项目统计\",\"products\":[\"政策检索\",\"立项项目统计\"],\"limit\":\"数据来自政策公开数据库；少量字段可能存在更新延迟。\"} 实际记录样本={\"level_dist\":[{\"层级\":\"国家级\",\"项目数\":\"13\"},{\"层级\":\"省级\",\"项目数\":\"14\"}],\"agency_stat\":[{\"主管机构\":\"中华人民共和国国家发展和改革委员会\",\"项目数量\":\"1\"},{\"主管机构\":\"中国质量协会\",\"项目数量\":\"1\"}],\"year_project_stat\":[{\"年份\":\"2019\",\"获批项目数\":\"9\"},{\"年份\":\"2020\",\"获批项目数\":\"7\"}],\"type_dist\":[{\"政策类型\":\"申报指南\",\"数量\":\"3\"},{\"政策类型\":\"其他政策\",\"数量\":\"1\"}],\"keyword_freq\":[{\"主题词\":\"创新\",\"出现次数\":\"11\"},{\"主题词\":\"技术\",\"出现次数\":\"9\"}],\"monthly_trend\":[{\"月份\":\"2026-10\",\"政策数量\":\"5\"}],\"search_records\":[{\"政策标题\":\"深圳市科技创新局关于发布《2026年深圳鲲鹏青年创业项目申请指南》的通知\",\"发布机构\":\"罗湖区企业服务中心\",\"地区\":\"广东省、深圳市、罗湖区\",\"政策类型\":\"其他政策\",\"发布日期\":\"2026-10-26\",\"相关性\":\"标题确认\",\"命中位置\":\"标题+正文\",\"重复标记\":\"-\"},{\"政策标题\":\"深圳市科技创新局关于组织开展大型科研仪器实验人员技术课程的通知\",\"发布机构\":\"深圳市科技创新委员会\",\"地区\":\"广东省、深圳市\",\"政策类型\":\"申报指南\",\"发布日期\":\"2026-10-26\",\"相关性\":\"标题确认\",\"命中位置\":\"标题+正文\",\"重复标记\":\"-\"}]} 可见章节=[{\"title\":\"立项项目统计\",\"note\":null},{\"title\":\"项目层级分布\",\"note\":\"按申报层级（国家/省/市/区）统计获批项目占比\"},{\"title\":\"项目归口分布\",\"note\":\"按主管机构统计获批项目数量\"},{\"title\":\"获批项目趋势\",\"note\":\"按年度统计获批项目数量\"},{\"title\":\"政策类型分布\",\"note\":\"仅按标题确认且去重的当前页样本统计政策类型\"},{\"title\":\"政策主题词频\",\"note\":\"仅对标题确认且去重样本的正文(pnText)做子主题词统计\"},{\"title\":\"政策发布时间趋势\",\"note\":\"仅按标题确认且去重样本的发布月份统计\"},{\"title\":\"检索相关性校验\",\"note\":\"保留上游 total；主题聚合仅使用标题确认且按标题+机构+日期去重的当前页样本，正文命中仅作线索\"},{\"title\":\"政策检索明细\",\"note\":\"上游命中 10000 条；当前页 10 条，标题确认相关去重样本 5 条\"}]"
+      }
+    ],
+    "issues": [],
+    "evidence_binding": {
+      "report.json": "722eab5c9caf03a71379fec72626cd72ce37cc7ba5a9b3e856048a7b960aeefe",
+      "report.html": "e0f8ff50c17ab4adf5e1801965f680e133e8ec5337d0cbda6853b24161add833",
+      "report.md": "5a6f35adea6334a9f64bba12cda862b0d4f9faa22543b99bbb6697b00ce85503",
+      "calls.json": "ccc59899997e4b04f1d8d250b45f1b56d6e63e1487e3d165671a0aea23362905",
+      "result.json": "d6868657d2b61a0e0376d77fa28859b0e1a8e8b8f97726584c03957f73470597",
+      "source_manifest_sha256": "014e0c39ccd221d4b037bfafc75dc705b73521da54c003be18fa8ca62d4dab92"
+    }
+  }
+}

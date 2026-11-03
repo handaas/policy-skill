@@ -1,0 +1,31 @@
+[
+  {
+    "tool": "policy_bigdata_policy_search",
+    "domain": null,
+    "arguments": {
+      "matchKeyword": "专精特新企业赋能行动",
+      "pnType": "申报指南",
+      "pageIndex": 1,
+      "pageSize": 10,
+      "agency": "江门市工业和信息化局"
+    },
+    "invocation_id": "1793070075640030000",
+    "elapsed_seconds": 1.088,
+    "status": "data",
+    "error_category": null,
+    "result_type": "dict",
+    "top_level_fields": [
+      "resultList",
+      "total"
+    ],
+    "row_count": 2,
+    "reported_total": 2,
+    "numeric_evidence": [
+      {
+        "path": "total",
+        "value": 2
+      }
+    ],
+    "response_sha256": "e8bb1dd7afcc597d7d2b80418cc1f3f5085d89457c891efd03d0882dc4c20f16"
+  }
+]

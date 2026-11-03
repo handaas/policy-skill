@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "skill": "policy-skill",
+  "case_id": "07-rural-revitalization",
+  "title": "乡村振兴政策主题研究",
+  "invocation_id": "1793070078291263000",
+  "provenance": {
+    "integrator_id": "683e574805537ace146cc05e",
+    "runner_sha256": "05777c2f2b0791cb5157aef691206606dade8df7af3b17212285b7ae74632a66",
+    "credential_policy_sha256": "bcabf08a1ca92f28357c0e57a8bae9bfa910eb1d4b204d8195ee3b7a77106eed",
+    "scenario_sha256": "9a914a0e866880828130b1998cda65f6ad2907732084090d39bd55b303aac154",
+    "skill_source_hashes": {
+      "scripts/common.py": "e3bddaa56284efe9e963bb8fd9749a13afec7a37b4355daf3d902251243680b5",
+      "scripts/compose_report.py": "37c32c6fea05e82cbe175b656be2a7e59dd268dae9eb01227e1c17ccf45a82ba",
+      "scripts/mcp_client.py": "032ebb6a99427031f65d03c9588fe7c32ce8064e0a5480ac6bd1918a914c5c0e",
+      "scripts/render_report.py": "0c638b43ffc6410ef4cda94ee51d3e50dc83dea9d32de20ef0521cf9ee4e2cfe",
+      "scripts/validate_config.py": "c146c2ad5a121483dc5a638f6d393ef0a5eb10904bb15305b02a435c9d28cece"
+    },
+    "upstream_source_hashes": {
+      "policy-mcp-server": "298984f4dbd1f7a39fa3a4fde6e1c7fff11acce6242dd61c35779b7f277ba179"
+    },
+    "upstream_dependency_hashes": {
+      "policy-mcp-server/server/mcp_server.py": "298984f4dbd1f7a39fa3a4fde6e1c7fff11acce6242dd61c35779b7f277ba179"
+    }
+  },
+  "source_changed_during_run": false,
+  "started_at": "2026-10-27T11:01:18+08:00",
+  "elapsed_seconds": 2.348,
+  "returncode": 0,
+  "exception_type": null,
+  "command": "python3 policy-skill/scripts/compose_report.py --keyword '乡村振兴' --pn-type '全部' --page-size 10 --output policy-skill/output/live-replaced-20261027/07-rural-revitalization/report.json --report-output policy-skill/output/live-replaced-20261027/07-rural-revitalization/report.html",
+  "transport": "local MCP servers via loopback streamable-http",
+  "cache_used": false,
+  "call_count": 1,
+  "successful_data_calls": 1,
+  "empty_calls": 0,
+  "failed_calls": 0,
+  "checks": {
+    "issues": [],
+    "warnings": [],
+    "coverage_pct": 56,
+    "subject": {
+      "keyword": "乡村振兴",
+      "matchKeyword": "乡村振兴",
+      "enterprise": "",
+      "enterprise_input": "",
+      "enterprise_resolved": false,
+      "enterprise_resolve_reason": "未提供企业主体",
+      "enterprise_blocked_reason": "",
+      "pn_type": "全部",
+      "agency": "",
+      "address": "",
+      "policy_id": ""
+    },
+    "title": "“乡村振兴” 政策大数据报告",
+    "data_mode": null,
+    "metrics": [
+      {
+        "label": "政策检索结果",
+        "value": "10000",
+        "hint": "本次政策检索命中条数"
+      },
+      {
+        "label": "政策类型数",
+        "value": "1",
+        "hint": "涉及的政策类型数"
+      },
+      {
+        "label": "高频主题词",
+        "value": "2",
+        "hint": "出现频次较高的主题词数"
+      },
+      {
+        "label": "最热主题",
+        "value": "资金",
+        "hint": "出现频次最高的主题词"
+      },
+      {
+        "label": "覆盖月份",
+        "value": "1",
+        "hint": "有政策发布的月份数"
+      },
+      {
+        "label": "发布机构数",
+        "value": "2",
+        "hint": "涉及的政策发布机构数"
+      }
+    ],
+    "quality_report": {
+      "total_sections": 9,
+      "populated_sections": 5,
+      "empty_sections": 4,
+      "coverage_pct": 56
+    },
+    "unregistered_tools": [],
+    "checks": {
+      "json_html_markdown": true,
+      "explicit_live": true,
+      "tool_calls_recorded": 1,
+      "offline_scripts": true,
+      "independent_rerender": true,
+      "offline_browser": true
+    }
+  },
+  "status": "passed",
+  "source_hashes": {
+    "scripts/common.py": "e3bddaa56284efe9e963bb8fd9749a13afec7a37b4355daf3d902251243680b5",
+    "scripts/compose_report.py": "37c32c6fea05e82cbe175b656be2a7e59dd268dae9eb01227e1c17ccf45a82ba",
+    "scripts/mcp_client.py": "032ebb6a99427031f65d03c9588fe7c32ce8064e0a5480ac6bd1918a914c5c0e",
+    "scripts/render_report.py": "0c638b43ffc6410ef4cda94ee51d3e50dc83dea9d32de20ef0521cf9ee4e2cfe",
+    "scripts/validate_config.py": "c146c2ad5a121483dc5a638f6d393ef0a5eb10904bb15305b02a435c9d28cece"
+  },
+  "technical_status": "passed",
+  "audited_at": "2026-10-27T11:13:02+08:00",
+  "evidence_binding": {
+    "report.json": "b411bdc29f07e6715af96a5576e88d843fc2fe1ec4518db6f3014e9a69c4122c",
+    "report.html": "35014b4ee0b353e42fcdfea4e79a75c65bcba112762c9c64d09acf4211002a57",
+    "report.md": "f185ab800b4bb1e8c8b289e77fcb99fb633b026c2cea8293f184ad3a92ecc91b",
+    "calls.json": "e0a1c21c1436bd5019d941e7546bbafe95b016e9d5db624bbcf7a69da381d6cf",
+    "result.json": "0f77a6a2b3301a6e4804d99e2b4e981d91de32e21cdc2fc47880ca06ba078b9c",
+    "source_manifest_sha256": "014e0c39ccd221d4b037bfafc75dc705b73521da54c003be18fa8ca62d4dab92"
+  }
+}

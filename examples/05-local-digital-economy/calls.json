@@ -1,0 +1,31 @@
+[
+  {
+    "tool": "policy_bigdata_policy_search",
+    "domain": null,
+    "arguments": {
+      "matchKeyword": "数字经济",
+      "pnType": "公示公开",
+      "pageIndex": 1,
+      "pageSize": 10,
+      "address": "[[\"福建省\"]]"
+    },
+    "invocation_id": "1793070077773986000",
+    "elapsed_seconds": 2.31,
+    "status": "data",
+    "error_category": null,
+    "result_type": "dict",
+    "top_level_fields": [
+      "resultList",
+      "total"
+    ],
+    "row_count": 10,
+    "reported_total": 96,
+    "numeric_evidence": [
+      {
+        "path": "total",
+        "value": 96
+      }
+    ],
+    "response_sha256": "860c79bb4e58c753fa804283dce2d7a6ac32f11623edbb37841e1bacc8d8f30e"
+  }
+]

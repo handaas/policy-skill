@@ -1,0 +1,67 @@
+{
+  "metric_overflows": [],
+  "document_title": "“科技创新” 政策大数据报告",
+  "title_matches": true,
+  "charts": 6,
+  "rendered_charts": 6,
+  "zero_size_charts": 0,
+  "chart_details": [
+    {
+      "width": 984,
+      "height": 300,
+      "instance": true,
+      "renderer": true,
+      "graphics": 25
+    },
+    {
+      "width": 984,
+      "height": 300,
+      "instance": true,
+      "renderer": true,
+      "graphics": 117
+    },
+    {
+      "width": 984,
+      "height": 300,
+      "instance": true,
+      "renderer": true,
+      "graphics": 43
+    },
+    {
+      "width": 984,
+      "height": 300,
+      "instance": true,
+      "renderer": true,
+      "graphics": 19
+    },
+    {
+      "width": 984,
+      "height": 300,
+      "instance": true,
+      "renderer": true,
+      "graphics": 29
+    },
+    {
+      "width": 984,
+      "height": 300,
+      "instance": true,
+      "renderer": true,
+      "graphics": 25
+    }
+  ],
+  "page_width": 1905,
+  "viewport_width": 1920,
+  "empty_headers": 0,
+  "script_errors": [],
+  "external_resources": 0,
+  "external_asset_references": 0,
+  "ok": true,
+  "report_html_sha256": "e0f8ff50c17ab4adf5e1801965f680e133e8ec5337d0cbda6853b24161add833",
+  "report_json_sha256": "722eab5c9caf03a71379fec72626cd72ce37cc7ba5a9b3e856048a7b960aeefe",
+  "skill": "policy-skill",
+  "id": "04-enterprise-approved-projects",
+  "browser": "Ego Lite",
+  "space_id": 4,
+  "offline": true,
+  "checked_at": "2026-10-27T03:03:50.644Z"
+}

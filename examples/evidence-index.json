@@ -1,0 +1,77 @@
+{
+  "run_id": "live-replaced-20261027",
+  "cases": [
+    {
+      "skill": "policy-skill",
+      "id": "09-jiangmen-specialized-action",
+      "status": "passed",
+      "positive_business_pass": true,
+      "files_sha256": {
+        "report.json": "56614cdfc99c43fb21cb8c71615420998cd9d5dba211072cde58bc5d7754cab0",
+        "report.html": "50f02057f61dc3c052e1e7b1b1f89b9f8a6ca0fc50f37d2dbef8554926871be8",
+        "report.md": "933174fc59e60dd55e216b6c1a9eb64eff972d2fc577825c2c64b6128655ac37",
+        "calls.json": "b3b24c5237e3c18638354cd02a3a507b69a087b58802885d879796dfdfb65b0f",
+        "result.json": "28457c65661c4966ba7d8addf927585db0d9d459b087090f71e2750cb0c97816",
+        "audit.json": "38e930342c8c0209118106869bf6f9935822c98381b6efb78114badfe2b59bb9",
+        "acceptance.json": "a539658cd9903343ff6e65dc38bf866411b21b29ac3b75b737ab68ccac142dd5",
+        "business-review.json": "13141c251cff814cc5355aabd864a0e2ad60cc4242bbf9c4508eb20021defb5d",
+        "browser-check.json": "01a9bca298ccbd13f443af285cc0a242dcf0f979705f51909e8222c4a606b9d4"
+      },
+      "audit_record": "../../test-records/live-replaced-20261027/09-jiangmen-specialized-action.md"
+    },
+    {
+      "skill": "policy-skill",
+      "id": "04-enterprise-approved-projects",
+      "status": "passed",
+      "positive_business_pass": true,
+      "files_sha256": {
+        "report.json": "722eab5c9caf03a71379fec72626cd72ce37cc7ba5a9b3e856048a7b960aeefe",
+        "report.html": "e0f8ff50c17ab4adf5e1801965f680e133e8ec5337d0cbda6853b24161add833",
+        "report.md": "5a6f35adea6334a9f64bba12cda862b0d4f9faa22543b99bbb6697b00ce85503",
+        "calls.json": "ccc59899997e4b04f1d8d250b45f1b56d6e63e1487e3d165671a0aea23362905",
+        "result.json": "d6868657d2b61a0e0376d77fa28859b0e1a8e8b8f97726584c03957f73470597",
+        "audit.json": "6901e28edbd6304d4fad9c5f503231d70df8135504ada2272fff3b4dfdf0ca44",
+        "acceptance.json": "ac13f260f9e7d3d1aeae42ebef2017d2ed26d593f9f636f23ea2524f7f150c2c",
+        "business-review.json": "eea81084f236e369d98fc865f405f710b71e3ef98a6810cf53a6eede2f903085",
+        "browser-check.json": "7fb2ff93eedbfa3d97dabc0259aa67a51680a5b71a2dd0fb5bce69082f404e2c"
+      },
+      "audit_record": "../../test-records/live-replaced-20261027/04-enterprise-approved-projects.md"
+    },
+    {
+      "skill": "policy-skill",
+      "id": "05-local-digital-economy",
+      "status": "passed",
+      "positive_business_pass": true,
+      "files_sha256": {
+        "report.json": "0095f936826949a3f1281c91e73560bc0a83b7fa8cc029a2276877962a37bd64",
+        "report.html": "b763abd57fbcfbd320a11671e1f91b001088522ed1f08a88c9d54946936e1703",
+        "report.md": "548c2ffcd9af86a751c3f21eb2bca07e6f810643128ac3f2fe10a4f9876d4203",
+        "calls.json": "0f0f5f6cda1fc45242e0e7a639b9b93fc24cbfff775f22b7a0207aedf91c1626",
+        "result.json": "cc37e07ba3861b4e144aa4ca084f28c4b930aa33d47a15e4d42141916392101c",
+        "audit.json": "a6e3134464270821d785957e48ec5362a088b2f013d4c63b618f096c2c22ad3a",
+        "acceptance.json": "27cce7ea5fc574c7ff8ba516bcf724dc25a790231893f571a35af4d18ec31671",
+        "business-review.json": "e1c57d52fb7d8075b4e8e01083d860544158bea9731c933d8ec58784a9ff739f",
+        "browser-check.json": "432c2fc9e377f8ba68713069db664b1e1075884654b2b5aa8059aaa88bf8987c"
+      },
+      "audit_record": "../../test-records/live-replaced-20261027/05-local-digital-economy.md"
+    },
+    {
+      "skill": "policy-skill",
+      "id": "07-rural-revitalization",
+      "status": "passed",
+      "positive_business_pass": true,
+      "files_sha256": {
+        "report.json": "b411bdc29f07e6715af96a5576e88d843fc2fe1ec4518db6f3014e9a69c4122c",
+        "report.html": "35014b4ee0b353e42fcdfea4e79a75c65bcba112762c9c64d09acf4211002a57",
+        "report.md": "f185ab800b4bb1e8c8b289e77fcb99fb633b026c2cea8293f184ad3a92ecc91b",
+        "calls.json": "e0a1c21c1436bd5019d941e7546bbafe95b016e9d5db624bbcf7a69da381d6cf",
+        "result.json": "0f77a6a2b3301a6e4804d99e2b4e981d91de32e21cdc2fc47880ca06ba078b9c",
+        "audit.json": "a151c4b405e551dfc89fc886a4b86f81abdfdc1f9c0f1758d7386960703754d5",
+        "acceptance.json": "0daa06162000c8e5da575d734157e28190bc213b6b99ca1dde126130fe9ecc10",
+        "business-review.json": "33ecf31f81041f7a273b0f115c5455a56484f7f2e9d399610d3f82315d5ca4b9",
+        "browser-check.json": "7759da24d0bedb8d6c913c7a706e985844f1cc5fe57b3759846c726aa4df4a50"
+      },
+      "audit_record": "../../test-records/live-replaced-20261027/07-rural-revitalization.md"
+    }
+  ]
+}
