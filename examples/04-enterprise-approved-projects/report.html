@@ -37,6 +37,7 @@
     .biz-metric .m-tag.t-down { color:#dc2626; }
     .biz-metric .m-tag.t-neutral { color:#6366f1; }
     .biz-metric .m-value { color:#0b3768; font-size:26px; line-height:1.1; font-weight:900; letter-spacing:-.02em; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; margin-top:auto; }
+    .biz-metric .m-hint { color:#64748b; font-size:11px; line-height:1.5; margin-top:6px; text-align:left; }
     .biz-metric .m-value .m-tag.t-up { color:#16a34a; }
     .biz-metric .m-value .m-tag.t-down { color:#dc2626; }
     .biz-metric .m-value .m-tag.t-neutral { color:#6366f1; }
@@ -165,7 +166,57 @@
     .glossary-term { display:flex; align-items:flex-start; padding:12px 14px; background:#f1f6fb; color:#0b5ca8; font-size:13px; font-weight:800; border-right:3px solid #0b5ca8; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
     .glossary-def { padding:12px 16px; color:#334155; font-size:13px; line-height:1.7; }
   </style>
-  <script>
+  <style>
+.chart-frame{position:relative;width:100%;height:300px;}
+.chart-box-gauge .chart-frame{height:240px;}
+.chart-static{position:absolute;top:0;left:0;width:100%;height:100%;overflow:hidden;}
+.chart-static svg{display:block;width:100%;height:100%;}
+.chart-frame .chart-canvas{position:absolute;top:0;left:0;width:100%;height:100% !important;visibility:hidden;z-index:1;}
+.chart-frame[data-chart-state="ready"] .chart-canvas{visibility:visible;}
+.chart-frame[data-chart-state="ready"] .chart-static{visibility:hidden;}
+.chart-frame .chart-status{position:absolute;left:0;right:0;bottom:0;margin:0;padding:2px 8px;font-size:11px;color:#64748b;text-align:center;background:rgba(255,255,255,.88);z-index:2;}
+.chart-frame .chart-status:empty{display:none;}
+@media print{
+  .chart-frame{height:auto;overflow:visible;}
+  .chart-frame .chart-canvas{display:none !important;visibility:hidden;}
+  .chart-frame .chart-static{position:static;display:block !important;visibility:visible !important;}
+  .chart-frame .chart-status{display:none;}
+  .chart-static svg{height:auto;}
+}
+</style>
+<script>function handaasChartOption(spec){
+  if(!spec || ['line','bar','pie','gauge','radar'].indexOf(spec.type)<0){return null;}
+  var PALETTE=['#0b5ca8','#0284c7','#0b3768','#d97706','#059669','#dc2626','#7c3aed','#db2777','#0891b2','#65a30d'];
+  var FONTS="-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif";
+  var opt={animation:false,color:PALETTE,tooltip:{trigger: spec.type==='pie'?'item':'axis'},textStyle:{fontFamily:FONTS,fontSize:12,color:'#334155'},grid:{left:48,right:24,top:30,bottom:40},legend:{top:0,textStyle:{fontSize:11}}};
+  if(spec.type==='line'){
+    opt.xAxis={type:'category',data:spec.x,axisLabel:{fontSize:11,interval:0,rotate: spec.x && spec.x.length>6?35:0}};
+    opt.yAxis={type:'value'};
+    opt.series=spec.series.map(function(s){return{name:s.name,type:'line',smooth:true,areaStyle: spec.area?{opacity:0.18}:undefined,stack: spec.stack?s.name:undefined,data:s.data,label:{show:true,position:'top',fontSize:11}};});
+    if(spec.stack){opt.tooltip={trigger:'axis'};}
+  }else if(spec.type==='bar'){
+    var horiz=spec.orient==='h';
+    var cats=spec.names, vals=spec.values;
+    if(horiz){opt.yAxis={type:'category',data:cats,axisLabel:{fontSize:11}};opt.xAxis={type:'value'};opt.grid={left:120,right:30,top:20,bottom:30};}
+    else{opt.xAxis={type:'category',data:cats,axisLabel:{fontSize:11,interval:0,rotate: cats&&cats.length>6?35:0}};opt.yAxis={type:'value'};}
+    opt.series=[{type:'bar',data:vals,itemStyle:{color:PALETTE[0]},label:{show:true,position: horiz?'right':'top',fontSize:11},barMaxWidth:42}];
+    opt.tooltip={trigger:'axis',axisPointer:{type:'shadow'}};
+  }else if(spec.type==='pie'){
+    opt.series=[{type:'pie',radius: spec.donut?['42%','68%']:'68%',center:['50%','55%'],data:spec.data,itemStyle:{borderColor:'#fff',borderWidth:2},label:{fontSize:11,formatter:'{b}: {c} ({d}%)'}}];
+    opt.legend={bottom:0,textStyle:{fontSize:11}};
+    opt.tooltip={trigger:'item',formatter:'{b}: {c} ({d}%)'};
+  }else if(spec.type==='gauge'){
+    var v=spec.value, mx=spec.max||100;
+    var col=v/mx>0.66?'#dc2626':(v/mx>0.33?'#d97706':'#059669');
+    opt.series=[{type:'gauge',min:0,max:mx,progress:{show:true,width:14,itemStyle:{color:col}},axisLine:{lineStyle:{width:14}},axisTick:{show:false},splitLine:{length:8,lineStyle:{color:'#fff'}},pointer:{width:5},detail:{valueAnimation:false,formatter:'{value}',fontSize:28,color:col,offsetCenter:[0,'30%']},data:[{value:v,name:spec.level||''}],title:{fontSize:13,color:'#475569',offsetCenter:[0,'62%']}}];
+  }else if(spec.type==='radar'){
+    opt.radar={indicator:spec.indicators,radius:'62%',axisName:{color:'#475569',fontSize:11},splitArea:{areaStyle:{color:['#f8fbff','#eef4fb']}}};
+    opt.series=[{type:'radar',areaStyle:{opacity:0.18},data:spec.series}];
+  }
+  return opt;
+}
+</script>
+<script>
 /*
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -218,8 +269,10 @@ var Fr={},Gr={};var Wr,Hr=function(){function t(t,e,n){var i=this;this._sleepAft
   var status=window.__handaas_chart_status={state:'waiting',total:0,ready:0,failed:0};
   var timer=null, retries=0, MAX_RETRIES=100;
   var layoutRetries=0, MAX_LAYOUT_RETRIES=50;
-  var PALETTE=['#0b5ca8','#0284c7','#0b3768','#d97706','#059669','#dc2626','#7c3aed','#db2777','#0891b2','#65a30d'];
-  var FONTS='-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif';
+  var MSG_LOADING='图表库正在加载，数据明细仍可查看。';
+  var MSG_MISSING='图表交互不可用，已保留静态图表，数据明细仍可查看。';
+  var MSG_LAYOUT='图表等待布局完成后渲染，数据明细仍可查看。';
+  var MSG_FAILED='图表交互初始化失败，已保留静态图表，数据明细仍可查看。';
   function summarize(nodes){
     status.total=nodes.length;status.ready=0;status.failed=0;
     nodes.forEach(function(el){
@@ -229,18 +282,40 @@ var Fr={},Gr={};var Wr,Hr=function(){function t(t,e,n){var i=this;this._sleepAft
     status.state=status.ready===status.total?'ready':
       (status.ready+status.failed===status.total?(status.ready?'degraded':'error'):'waiting');
   }
+  function frameOf(el){
+    var p=el.parentElement;
+    if(p&&(' '+p.className+' ').indexOf(' chart-frame ')>-1){return p;}
+    return null;
+  }
+  function setStatus(el,msg){
+    var f=frameOf(el);
+    if(f){
+      var p=f.querySelector('.chart-status');
+      if(p){p.textContent=msg;}
+    }else{
+      el.textContent=msg;
+    }
+  }
   function raf(fn){if(window.requestAnimationFrame){window.requestAnimationFrame(fn);}else{fn();}}
+  function hasGeometry(chart,el){
+    if(!chart || chart.getWidth()<2 || chart.getHeight()<2){return false;}
+    var svg=el.querySelector('svg');
+    if(!svg){return false;}
+    return !!svg.querySelector('path,rect,circle,line,text,polygon,polyline');
+  }
   function boot(){
     if(document.readyState==='loading'){return;}
     var nodes=document.querySelectorAll('.chart-canvas');
     if(!nodes.length){summarize(nodes);return;}
-    if(!window.echarts || typeof window.echarts.init!=='function'){
+    if(!window.echarts || typeof window.echarts.init!=='function' || typeof window.handaasChartOption!=='function'){
       var exhausted=retries>=MAX_RETRIES;
       nodes.forEach(function(el){
         if(el.__handaas_chart_ready){return;}
         el.__handaas_dependency_error=true;
         el.setAttribute('data-chart-state',exhausted?'error':'waiting');
-        el.textContent=exhausted?'图表库加载失败或不可用，请查看数据明细或重新生成离线报告。':'图表库正在加载，数据明细仍可查看。';
+        setStatus(el,exhausted?MSG_MISSING:MSG_LOADING);
+        var f=frameOf(el);
+        if(f){f.setAttribute('data-chart-state',exhausted?'error':'static');}
       });
       summarize(nodes);
       if(!exhausted && timer===null){
@@ -253,6 +328,7 @@ var Fr={},Gr={};var Wr,Hr=function(){function t(t,e,n){var i=this;this._sleepAft
     var pendingLayout=0;
     nodes.forEach(function(el){
       if(el.__handaas_chart_ready){return;}
+      var f=frameOf(el);
       if(el.getAttribute('data-chart-state')==='error' && !el.__handaas_dependency_error){return;}
       if(window.ResizeObserver && !el.__handaas_resize_observer){
         el.__handaas_resize_observer=new ResizeObserver(function(){
@@ -264,7 +340,8 @@ var Fr={},Gr={};var Wr,Hr=function(){function t(t,e,n){var i=this;this._sleepAft
       }
       if((el.getClientRects && el.getClientRects().length===0) || el.clientWidth<2 || el.clientHeight<2){
         el.setAttribute('data-chart-state','waiting');
-        el.textContent='图表等待布局完成后渲染，数据明细仍可查看。';
+        setStatus(el,MSG_LAYOUT);
+        if(f){f.setAttribute('data-chart-state','static');}
         pendingLayout++;
         return;
       }
@@ -274,46 +351,36 @@ var Fr={},Gr={};var Wr,Hr=function(){function t(t,e,n){var i=this;this._sleepAft
         if(!raw){throw new Error('Missing chart configuration');}
         // getAttribute already decodes HTML entities; a second decode corrupts labels.
         var spec=JSON.parse(raw);
-        if(['line','bar','pie','gauge','radar'].indexOf(spec.type)<0){throw new Error('Unsupported chart type');}
+        var opt=window.handaasChartOption(spec);
+        if(!opt){throw new Error('Unsupported chart type');}
         el.textContent='';
         chart=window.echarts.init(el,null,{renderer:'svg'});
-      var opt={color:PALETTE,tooltip:{trigger: spec.type==='pie'?'item':'axis'},textStyle:{fontFamily:FONTS,fontSize:12,color:'#334155'},grid:{left:48,right:24,top:30,bottom:40},legend:{top:0,textStyle:{fontSize:11}}};
-      if(spec.type==='line'){
-        opt.xAxis={type:'category',data:spec.x,axisLabel:{fontSize:11,interval:0,rotate: spec.x && spec.x.length>6?35:0}};
-        opt.yAxis={type:'value'};
-        opt.series=spec.series.map(function(s){return{name:s.name,type:'line',smooth:true,areaStyle: spec.area?{opacity:0.18}:undefined,stack: spec.stack?s.name:undefined,data:s.data,label:{show:true,position:'top',fontSize:11}};});
-        if(spec.stack){opt.tooltip={trigger:'axis'};}
-      }else if(spec.type==='bar'){
-        var horiz=spec.orient==='h';
-        var cats=spec.names, vals=spec.values;
-        if(horiz){opt.yAxis={type:'category',data:cats,axisLabel:{fontSize:11}};opt.xAxis={type:'value'};opt.grid={left:120,right:30,top:20,bottom:30};}
-        else{opt.xAxis={type:'category',data:cats,axisLabel:{fontSize:11,interval:0,rotate: cats&&cats.length>6?35:0}};opt.yAxis={type:'value'};}
-        opt.series=[{type:'bar',data:vals,itemStyle:{color:PALETTE[0]},label:{show:true,position: horiz?'right':'top',fontSize:11},barMaxWidth:42}];
-        opt.tooltip={trigger:'axis',axisPointer:{type:'shadow'}};
-      }else if(spec.type==='pie'){
-        opt.series=[{type:'pie',radius: spec.donut?['42%','68%']:'68%',center:['50%','55%'],data:spec.data,itemStyle:{borderColor:'#fff',borderWidth:2},label:{fontSize:11,formatter:'{b}: {c} ({d}%)'}}];
-        opt.legend={bottom:0,textStyle:{fontSize:11}};
-        opt.tooltip={trigger:'item',formatter:'{b}: {c} ({d}%)'};
-      }else if(spec.type==='gauge'){
-        var v=spec.value, mx=spec.max||100;
-        var col=v/mx>0.66?'#dc2626':(v/mx>0.33?'#d97706':'#059669');
-        opt.series=[{type:'gauge',min:0,max:mx,progress:{show:true,width:14,itemStyle:{color:col}},axisLine:{lineStyle:{width:14}},axisTick:{show:false},splitLine:{length:8,lineStyle:{color:'#fff'}},pointer:{width:5},detail:{valueAnimation:true,formatter:'{value}',fontSize:28,color:col,offsetCenter:[0,'30%']},data:[{value:v,name:spec.level||''}],title:{fontSize:13,color:'#475569',offsetCenter:[0,'62%']}}];
-      }else if(spec.type==='radar'){
-        opt.radar={indicator:spec.indicators,radius:'62%',axisName:{color:'#475569',fontSize:11},splitArea:{areaStyle:{color:['#f8fbff','#eef4fb']}}};
-        opt.series=[{type:'radar',areaStyle:{opacity:0.18},data:spec.series}];
-      }
         chart.setOption(opt);
+        // Real synchronous flush: setOption already flushes internally, but
+        // drive the zrender painter once more before the geometry gate. Any
+        // throw here falls into catch and keeps the static SVG.
+        var zr=chart.getZr();
+        if(zr && typeof zr.flush==='function'){zr.flush();}
+        // Never reveal the interactive layer (and never hide the static SVG)
+        // before real SVG geometry exists on the canvas overlay.
+        if(!hasGeometry(chart,el)){throw new Error('Empty chart geometry');}
         el.__handaas_chart=chart;
         el.__handaas_chart_ready=true;
         el.__handaas_dependency_error=false;
         el.setAttribute('data-chart-state','ready');
         window.__echarts_instances.push(chart);
+        if(f){
+          f.setAttribute('data-chart-state','ready');
+          var p=f.querySelector('.chart-status');
+          if(p){p.textContent='';}
+        }
         raf(function(){try{chart.resize();}catch(ignored){}});
       }catch(e){
         if(chart && typeof chart.dispose==='function'){try{chart.dispose();}catch(ignored){}}
         el.__handaas_dependency_error=false;
         el.setAttribute('data-chart-state','error');
-        el.textContent='图表绘制失败，请查看数据明细。';
+        setStatus(el,MSG_FAILED);
+        if(f){f.setAttribute('data-chart-state','error');}
       }
     });
     summarize(nodes);
@@ -363,7 +430,7 @@ var Fr={},Gr={};var Wr,Hr=function(){function t(t,e,n){var i=this;this._sleepAft
         <h1>“科技创新” 政策大数据报告</h1>
         <p class="report-lead">本报告以政策关键词“科技创新”为检索对象，基于政策公开数据，系统呈现政策检索明细、立项项目统计、项目归口分布、获批项目趋势。关键指标包括：国家级项目 13、省级项目 14、市级项目 20、区级项目 15、政策检索结果 10000。检索聚合仅使用当前页标题确认且按稳定字段去重的样本；正文命中仅保留为待复核线索，上游 total 原样保留，分布与趋势不作因果解释</p>
         <div class="abstract-box">报告涵盖查询对象、数据总览、核心分析、代表性记录与结构洞察，所有数据均标注口径与来源。</div>
-        <div class="biz-metrics"><div class="biz-metric"><span class="m-name">国家级项目</span><span class="m-tag t-neutral">占 21%</span><span class="m-value">13</span></div><div class="biz-metric"><span class="m-name">省级项目</span><span class="m-tag t-neutral">占 23%</span><span class="m-value">14</span></div><div class="biz-metric"><span class="m-name">市级项目</span><span class="m-tag t-neutral">占 32%</span><span class="m-value">20</span></div><div class="biz-metric"><span class="m-name">区级项目</span><span class="m-tag t-neutral">占 24%</span><span class="m-value">15</span></div><div class="biz-metric"><span class="m-name">政策检索结果</span><span class="m-tag"></span><span class="m-value">10000</span></div><div class="biz-metric"><span class="m-name">政策类型数</span><span class="m-tag"></span><span class="m-value">3</span></div><div class="biz-metric"><span class="m-name">高频主题词</span><span class="m-tag"></span><span class="m-value">3</span></div><div class="biz-metric"><span class="m-name">最热主题</span><span class="m-tag"></span><span class="m-value">创新</span></div><div class="biz-metric"><span class="m-name">覆盖月份</span><span class="m-tag"></span><span class="m-value">1</span></div><div class="biz-metric"><span class="m-name">发布机构数</span><span class="m-tag"></span><span class="m-value">4</span></div><div class="biz-metric-empty"></div><div class="biz-metric-empty"></div></div>
+        <div class="biz-metrics"><div class="biz-metric"><span class="m-name">国家级项目</span><span class="m-tag t-neutral">占 21%</span><span class="m-value">13</span><span class="m-hint">获批国家级项目数量</span></div><div class="biz-metric"><span class="m-name">省级项目</span><span class="m-tag t-neutral">占 23%</span><span class="m-value">14</span><span class="m-hint">获批省级项目数量</span></div><div class="biz-metric"><span class="m-name">市级项目</span><span class="m-tag t-neutral">占 32%</span><span class="m-value">20</span><span class="m-hint">获批市级项目数量</span></div><div class="biz-metric"><span class="m-name">区级项目</span><span class="m-tag t-neutral">占 24%</span><span class="m-value">15</span><span class="m-hint">获批区级项目数量</span></div><div class="biz-metric"><span class="m-name">政策检索结果</span><span class="m-tag"></span><span class="m-value">10000</span><span class="m-hint">本次政策检索命中条数</span></div><div class="biz-metric"><span class="m-name">政策类型数</span><span class="m-tag"></span><span class="m-value">3</span><span class="m-hint">涉及的政策类型数</span></div><div class="biz-metric"><span class="m-name">高频主题词</span><span class="m-tag"></span><span class="m-value">3</span><span class="m-hint">出现频次较高的主题词数</span></div><div class="biz-metric"><span class="m-name">最热主题</span><span class="m-tag"></span><span class="m-value">创新</span><span class="m-hint">出现频次最高的主题词</span></div><div class="biz-metric"><span class="m-name">覆盖月份</span><span class="m-tag"></span><span class="m-value">1</span><span class="m-hint">有政策发布的月份数</span></div><div class="biz-metric"><span class="m-name">发布机构数</span><span class="m-tag"></span><span class="m-value">4</span><span class="m-hint">涉及的政策发布机构数</span></div><div class="biz-metric-empty"></div><div class="biz-metric-empty"></div></div>
         <ul class="exec-list"><li>该占比仅描述已返回获批项目的层级结构，不能据此推断企业能力、政府认可程度或未来获批概率。</li><li>当前返回样本的归口分布较分散；这是历史分布观察，不证明渠道稳定性或申报成效。</li><li>年度变化仅是已返回项目数量的描述性趋势；没有外部政策、竞争或申报过程证据，不能解释变化原因。</li><li>该比例仅描述当前页标题确认且去重样本的类型构成，不代表可申报机会数量、实施成效或竞争强度。</li><li>上游 total 未经本地相关性过滤；正文命中仅作为待复核线索，只能基于当前页标题确认样本做描述，不外推政策适用范围或价值。</li></ul>
         <div class="cover-findings"><h3 class="cover-findings-title">核心发现</h3><div class="cover-findings-grid"><div class="finding-card"><p class="f-label">项目层级结构与高阶占比</p><p class="f-text">获批项目共 62 个，国家级+省级合计占 44%；最多为“市级”（32%）。</p></div><div class="finding-card"><p class="f-label">项目归口集中度</p><p class="f-text">“深圳市人力资源和社会保障局”获批项目占比约 20%，前 3 主管机构合计 41%（CR3）。</p></div><div class="finding-card"><p class="f-label">获批项目趋势</p><p class="f-text">峰值在“2021”（17 个），近年下降 94%，同比 -94%。</p></div><div class="finding-card"><p class="f-label">政策类型结构</p><p class="f-text">检索政策中“申报指南”类占比约 60%，前 3 类合计 100%（CR3）。</p></div></div></div>
         <div class="cover-dimensions"><span class="dim-label">分析维度</span><div class="dim-tags"><span class="dim-tag">立项项目统计</span><span class="dim-tag">项目层级分布</span><span class="dim-tag">项目归口分布</span><span class="dim-tag">获批项目趋势</span><span class="dim-tag">政策类型分布</span><span class="dim-tag">政策主题词频</span><span class="dim-tag">政策发布时间趋势</span><span class="dim-tag">检索相关性校验</span><span class="dim-tag">政策检索明细</span></div></div>
@@ -374,15 +441,435 @@ var Fr={},Gr={};var Wr,Hr=function(){function t(t,e,n){var i=this;this._sleepAft
   <main class="research-doc">
     <section class="report-page biz-section"><div class="report-topbar"><div class="report-stripe"></div><div class="report-banner">政策大数据报告</div></div><div class="biz-section-head"><div><h2>报告摘要</h2><p class="biz-section-note">概述分析对象、数据覆盖范围与核心发现。</p></div><span class="biz-tag">Summary</span></div><p class="biz-summary">本报告以政策关键词“科技创新”为检索对象，基于政策公开数据，系统呈现政策检索明细、立项项目统计、项目归口分布、获批项目趋势。关键指标包括：国家级项目 13、省级项目 14、市级项目 20、区级项目 15、政策检索结果 10000。检索聚合仅使用当前页标题确认且按稳定字段去重的样本；正文命中仅保留为待复核线索，上游 total 原样保留，分布与趋势不作因果解释</p></section>
     <section class="report-page biz-section"><div class="report-topbar"><div class="report-stripe"></div><div class="report-banner">政策大数据报告</div></div><div class="biz-section-head"><div><h2>查询对象与口径</h2><p class="biz-section-note">说明匹配对象、匹配方式与数据范围。</p></div><span class="biz-tag">Caliber</span></div><div class="info-list"><div class="info-row"><span class="info-label">匹配对象</span><span class="info-value">政策关键词“科技创新” / 企业“华为技术有限公司”</span></div><div class="info-row"><span class="info-label">匹配方式</span><span class="info-value">政策检索按政策关键词匹配（pnType=全部）；立项项目统计按企业主体“华为技术有限公司”匹配</span></div><div class="info-row"><span class="info-label">数据范围</span><span class="info-value">政策检索明细、立项项目统计</span></div><div class="info-row"><span class="info-label">局限说明</span><span class="info-value">数据来自政策公开数据库；少量字段可能存在更新延迟。</span></div></div></section>
-    <section class="report-page biz-section"><div class="report-topbar"><div class="report-stripe"></div><div class="report-banner">政策大数据报告</div></div><div class="biz-section-head"><div><h2>数据总览</h2><p class="biz-section-note">关键指标一览。</p></div><span class="biz-tag">Metrics</span></div><div class="biz-metrics"><div class="biz-metric"><span class="m-name">国家级项目</span><span class="m-tag t-neutral">占 21%</span><span class="m-value">13</span></div><div class="biz-metric"><span class="m-name">省级项目</span><span class="m-tag t-neutral">占 23%</span><span class="m-value">14</span></div><div class="biz-metric"><span class="m-name">市级项目</span><span class="m-tag t-neutral">占 32%</span><span class="m-value">20</span></div><div class="biz-metric"><span class="m-name">区级项目</span><span class="m-tag t-neutral">占 24%</span><span class="m-value">15</span></div><div class="biz-metric"><span class="m-name">政策检索结果</span><span class="m-tag"></span><span class="m-value">10000</span></div><div class="biz-metric"><span class="m-name">政策类型数</span><span class="m-tag"></span><span class="m-value">3</span></div><div class="biz-metric"><span class="m-name">高频主题词</span><span class="m-tag"></span><span class="m-value">3</span></div><div class="biz-metric"><span class="m-name">最热主题</span><span class="m-tag"></span><span class="m-value">创新</span></div><div class="biz-metric"><span class="m-name">覆盖月份</span><span class="m-tag"></span><span class="m-value">1</span></div><div class="biz-metric"><span class="m-name">发布机构数</span><span class="m-tag"></span><span class="m-value">4</span></div><div class="biz-metric-empty"></div><div class="biz-metric-empty"></div></div></section>
+    <section class="report-page biz-section"><div class="report-topbar"><div class="report-stripe"></div><div class="report-banner">政策大数据报告</div></div><div class="biz-section-head"><div><h2>数据总览</h2><p class="biz-section-note">关键指标一览。</p></div><span class="biz-tag">Metrics</span></div><div class="biz-metrics"><div class="biz-metric"><span class="m-name">国家级项目</span><span class="m-tag t-neutral">占 21%</span><span class="m-value">13</span><span class="m-hint">获批国家级项目数量</span></div><div class="biz-metric"><span class="m-name">省级项目</span><span class="m-tag t-neutral">占 23%</span><span class="m-value">14</span><span class="m-hint">获批省级项目数量</span></div><div class="biz-metric"><span class="m-name">市级项目</span><span class="m-tag t-neutral">占 32%</span><span class="m-value">20</span><span class="m-hint">获批市级项目数量</span></div><div class="biz-metric"><span class="m-name">区级项目</span><span class="m-tag t-neutral">占 24%</span><span class="m-value">15</span><span class="m-hint">获批区级项目数量</span></div><div class="biz-metric"><span class="m-name">政策检索结果</span><span class="m-tag"></span><span class="m-value">10000</span><span class="m-hint">本次政策检索命中条数</span></div><div class="biz-metric"><span class="m-name">政策类型数</span><span class="m-tag"></span><span class="m-value">3</span><span class="m-hint">涉及的政策类型数</span></div><div class="biz-metric"><span class="m-name">高频主题词</span><span class="m-tag"></span><span class="m-value">3</span><span class="m-hint">出现频次较高的主题词数</span></div><div class="biz-metric"><span class="m-name">最热主题</span><span class="m-tag"></span><span class="m-value">创新</span><span class="m-hint">出现频次最高的主题词</span></div><div class="biz-metric"><span class="m-name">覆盖月份</span><span class="m-tag"></span><span class="m-value">1</span><span class="m-hint">有政策发布的月份数</span></div><div class="biz-metric"><span class="m-name">发布机构数</span><span class="m-tag"></span><span class="m-value">4</span><span class="m-hint">涉及的政策发布机构数</span></div><div class="biz-metric-empty"></div><div class="biz-metric-empty"></div></div></section>
     <section class="report-page biz-section"><div class="report-topbar"><div class="report-stripe"></div><div class="report-banner">政策大数据报告</div></div><div class="biz-section-head"><div><h2>核心分析</h2><p class="biz-section-note">按维度展开目标核心数据与结构化明细。</p></div><span class="biz-tag">Analysis</span></div><h3 class="biz-subsection-title">立项项目统计</h3><div class="info-list"><div class="info-row"><span class="info-label">国家级项目数</span><span class="info-value">13</span></div><div class="info-row"><span class="info-label">省级项目数</span><span class="info-value">14</span></div><div class="info-row"><span class="info-label">市级项目数</span><span class="info-value">20</span></div><div class="info-row"><span class="info-label">区级项目数</span><span class="info-value">15</span></div><div class="info-row"><span class="info-label">匹配企业</span><span class="info-value">华为技术有限公司</span></div></div>
-<p class="biz-section-note">按申报层级（国家/省/市/区）统计获批项目占比</p><div class="chart-box"><h4 class="chart-title">项目层级分布</h4><div class="chart-canvas" data-chart="pie" data-spec="{&quot;type&quot;:&quot;pie&quot;,&quot;donut&quot;:true,&quot;data&quot;:[{&quot;name&quot;:&quot;国家级&quot;,&quot;value&quot;:13.0},{&quot;name&quot;:&quot;省级&quot;,&quot;value&quot;:14.0},{&quot;name&quot;:&quot;市级&quot;,&quot;value&quot;:20.0},{&quot;name&quot;:&quot;区级&quot;,&quot;value&quot;:15.0}]}"></div><details class="chart-data"><summary>数据明细</summary><div class="table-wrap"><table><thead><tr><th>层级</th><th>项目数</th></tr></thead><tbody><tr><td>国家级</td><td>13</td></tr><tr><td>省级</td><td>14</td></tr><tr><td>市级</td><td>20</td></tr><tr><td>区级</td><td>15</td></tr></tbody></table></div></details></div>
-<p class="biz-section-note">按主管机构统计获批项目数量</p><div class="chart-box"><h4 class="chart-title">项目归口分布</h4><div class="chart-canvas" data-chart="bar" data-spec="{&quot;type&quot;:&quot;bar&quot;,&quot;orient&quot;:&quot;v&quot;,&quot;names&quot;:[&quot;中华人民共和国国家发展和改革委员会&quot;,&quot;中国质量协会&quot;,&quot;北京市科学技术委员会&quot;,&quot;四川省农业农村厅&quot;,&quot;四川省科学技术厅&quot;,&quot;国家市场监督管理总局&quot;,&quot;国家知识产权局&quot;,&quot;广东省市场监督管理局（知识产权局）&quot;,&quot;江苏省人力资源社会保障厅&quot;,&quot;江苏省科学技术厅&quot;,&quot;深圳市人力资源和社会保障局&quot;,&quot;深圳市商务局&quot;,&quot;深圳市工业和信息化局&quot;,&quot;深圳市市场监督管理局&quot;,&quot;深圳市市场监督管理局（深圳市知识产权局）&quot;,&quot;深圳市科技创新委员会&quot;,&quot;深圳市龙岗区科技创新局&quot;,&quot;湖北省科学技术厅&quot;,&quot;湖南省工业和信息化厅&quot;,&quot;龙岗区人力资源局&quot;,&quot;龙岗区科技创新局&quot;,&quot;广东省科学技术厅&quot;,&quot;广东省发展和改革委员会&quot;,&quot;广东省工业和信息化厅&quot;,&quot;深圳市发展和改革委员会&quot;],&quot;values&quot;:[1.0,1.0,2.0,1.0,1.0,1.0,2.0,5.0,1.0,1.0,12.0,1.0,2.0,1.0,1.0,7.0,4.0,1.0,1.0,6.0,4.0,1.0,1.0,2.0,1.0]}"></div><details class="chart-data"><summary>数据明细</summary><div class="table-wrap"><table><thead><tr><th>主管机构</th><th>项目数量</th></tr></thead><tbody><tr><td>中华人民共和国国家发展和改革委员会</td><td>1</td></tr><tr><td>中国质量协会</td><td>1</td></tr><tr><td>北京市科学技术委员会</td><td>2</td></tr><tr><td>四川省农业农村厅</td><td>1</td></tr><tr><td>四川省科学技术厅</td><td>1</td></tr><tr><td>国家市场监督管理总局</td><td>1</td></tr><tr><td>国家知识产权局</td><td>2</td></tr><tr><td>广东省市场监督管理局（知识产权局）</td><td>5</td></tr><tr><td>江苏省人力资源社会保障厅</td><td>1</td></tr><tr><td>江苏省科学技术厅</td><td>1</td></tr><tr><td>深圳市人力资源和社会保障局</td><td>12</td></tr><tr><td>深圳市商务局</td><td>1</td></tr><tr><td>深圳市工业和信息化局</td><td>2</td></tr><tr><td>深圳市市场监督管理局</td><td>1</td></tr><tr><td>深圳市市场监督管理局（深圳市知识产权局）</td><td>1</td></tr><tr><td>深圳市科技创新委员会</td><td>7</td></tr><tr><td>深圳市龙岗区科技创新局</td><td>4</td></tr><tr><td>湖北省科学技术厅</td><td>1</td></tr><tr><td>湖南省工业和信息化厅</td><td>1</td></tr><tr><td>龙岗区人力资源局</td><td>6</td></tr><tr><td>龙岗区科技创新局</td><td>4</td></tr><tr><td>广东省科学技术厅</td><td>1</td></tr><tr><td>广东省发展和改革委员会</td><td>1</td></tr><tr><td>广东省工业和信息化厅</td><td>2</td></tr><tr><td>深圳市发展和改革委员会</td><td>1</td></tr></tbody></table></div></details></div>
-<p class="biz-section-note">按年度统计获批项目数量</p><div class="chart-box"><h4 class="chart-title">获批项目趋势</h4><div class="chart-canvas" data-chart="line" data-spec="{&quot;type&quot;:&quot;line&quot;,&quot;area&quot;:true,&quot;x&quot;:[&quot;2019&quot;,&quot;2020&quot;,&quot;2021&quot;,&quot;2022&quot;,&quot;2023&quot;],&quot;series&quot;:[{&quot;name&quot;:&quot;获批项目趋势&quot;,&quot;data&quot;:[9.0,7.0,17.0,17.0,1.0]}]}"></div><details class="chart-data"><summary>数据明细</summary><div class="table-wrap"><table><thead><tr><th>年份</th><th>获批项目数</th></tr></thead><tbody><tr><td>2019</td><td>9</td></tr><tr><td>2020</td><td>7</td></tr><tr><td>2021</td><td>17</td></tr><tr><td>2022</td><td>17</td></tr><tr><td>2023</td><td>1</td></tr></tbody></table></div></details></div>
-<p class="biz-section-note">仅按标题确认且去重的当前页样本统计政策类型</p><div class="chart-box"><h4 class="chart-title">政策类型分布</h4><div class="chart-canvas" data-chart="pie" data-spec="{&quot;type&quot;:&quot;pie&quot;,&quot;donut&quot;:true,&quot;data&quot;:[{&quot;name&quot;:&quot;申报指南&quot;,&quot;value&quot;:3.0},{&quot;name&quot;:&quot;其他政策&quot;,&quot;value&quot;:1.0},{&quot;name&quot;:&quot;公示公开&quot;,&quot;value&quot;:1.0}]}"></div><details class="chart-data"><summary>数据明细</summary><div class="table-wrap"><table><thead><tr><th>政策类型</th><th>数量</th></tr></thead><tbody><tr><td>申报指南</td><td>3</td></tr><tr><td>其他政策</td><td>1</td></tr><tr><td>公示公开</td><td>1</td></tr></tbody></table></div></details></div>
-<p class="biz-section-note">仅对标题确认且去重样本的正文(pnText)做子主题词统计</p><div class="chart-box"><h4 class="chart-title">政策主题词频</h4><div class="chart-canvas" data-chart="bar" data-spec="{&quot;type&quot;:&quot;bar&quot;,&quot;orient&quot;:&quot;v&quot;,&quot;names&quot;:[&quot;创新&quot;,&quot;技术&quot;,&quot;人才&quot;],&quot;values&quot;:[11.0,9.0,1.0]}"></div><details class="chart-data"><summary>数据明细</summary><div class="table-wrap"><table><thead><tr><th>主题词</th><th>出现次数</th></tr></thead><tbody><tr><td>创新</td><td>11</td></tr><tr><td>技术</td><td>9</td></tr><tr><td>人才</td><td>1</td></tr></tbody></table></div></details></div>
-<p class="biz-section-note">仅按标题确认且去重样本的发布月份统计</p><div class="chart-box"><h4 class="chart-title">政策发布时间趋势</h4><div class="chart-canvas" data-chart="line" data-spec="{&quot;type&quot;:&quot;line&quot;,&quot;area&quot;:true,&quot;x&quot;:[&quot;2026-10&quot;],&quot;series&quot;:[{&quot;name&quot;:&quot;政策发布时间趋势&quot;,&quot;data&quot;:[5.0]}]}"></div><details class="chart-data"><summary>数据明细</summary><div class="table-wrap"><table><thead><tr><th>月份</th><th>政策数量</th></tr></thead><tbody><tr><td>2026-10</td><td>5</td></tr></tbody></table></div></details></div>
-<h3 class="biz-subsection-title">检索相关性校验</h3><div class="info-list"><div class="info-row"><span class="info-label">上游总数</span><span class="info-value">10000</span></div><div class="info-row"><span class="info-label">当前页样本数</span><span class="info-value">10</span></div><div class="info-row"><span class="info-label">标题确认样本数（含重复）</span><span class="info-value">6</span></div><div class="info-row"><span class="info-label">标题确认去重样本数</span><span class="info-value">5</span></div><div class="info-row"><span class="info-label">正文线索样本数</span><span class="info-value">4</span></div><div class="info-row"><span class="info-label">未命中样本数</span><span class="info-value">0</span></div><div class="info-row"><span class="info-label">重复样本数</span><span class="info-value">1</span></div></div>
+<p class="biz-section-note">按申报层级（国家/省/市/区）统计获批项目占比</p><div class="chart-box"><h4 class="chart-title">项目层级分布</h4><div class="chart-frame" data-chart-state="static"><div class="chart-static"><svg width="984" height="300" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" baseProfile="full" viewBox="0 0 984 300">
+<rect width="984" height="300" x="0" y="0" fill="none"></rect>
+<polyline points="554.4 84.3 563.6 72.5 578.6 72.5" fill="transparent" stroke="#0b5ca8" class="zr0-cls-0"></polyline>
+<polyline points="583.6 209.9 597 216.5 612 216.5" fill="transparent" stroke="#0284c7" class="zr0-cls-0"></polyline>
+<polyline points="433.7 248.7 425.2 261 410.2 261" fill="transparent" stroke="#0b3768" class="zr0-cls-0"></polyline>
+<polyline points="421.7 91.1 411.4 80.2 396.4 80.2" fill="transparent" stroke="#d97706" class="zr0-cls-0"></polyline>
+<path d="M492 63A102 102 0 0 1 590.7 139.4L553 149.2A63 63 0 0 0 492 102Z" fill="#0b5ca8" stroke="#fff" stroke-width="2" stroke-linejoin="round" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="chart" class="zr0-cls-1"></path>
+<path d="M590.7 139.4A102 102 0 0 1 532.2 258.7L516.8 222.9A63 63 0 0 0 553 149.2Z" fill="#0284c7" stroke="#fff" stroke-width="2" stroke-linejoin="round" ecmeta_series_index="0" ecmeta_data_index="1" ecmeta_ssr_type="chart" class="zr0-cls-2"></path>
+<path d="M532.2 258.7A102 102 0 0 1 390.1 159.8L429.1 161.8A63 63 0 0 0 516.8 222.9Z" fill="#0b3768" stroke="#fff" stroke-width="2" stroke-linejoin="round" ecmeta_series_index="0" ecmeta_data_index="2" ecmeta_ssr_type="chart" class="zr0-cls-3"></path>
+<path d="M390.1 159.8A102 102 0 0 1 492 63L492 102A63 63 0 0 0 429.1 161.8Z" fill="#d97706" stroke="#fff" stroke-width="2" stroke-linejoin="round" ecmeta_series_index="0" ecmeta_data_index="3" ecmeta_ssr_type="chart" class="zr0-cls-4"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" xml:space="preserve" transform="translate(583.6164 72.4792)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">国家级: 13 (20.97%)</text>
+<text dominant-baseline="central" text-anchor="start" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" xml:space="preserve" transform="translate(617.0431 216.5261)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">省级: 14 (22.58%)</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" xml:space="preserve" transform="translate(405.1616 261.0293)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">市级: 20 (32.26%)</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" xml:space="preserve" transform="translate(391.3909 80.1992)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">区级: 15 (24.19%)</text>
+<path d="M-5 -5l263 0l0 26l-263 0Z" transform="translate(365.5 279)" fill="rgb(0,0,0)" fill-opacity="0" stroke="#ccc" stroke-width="0" class="zr0-cls-5"></path>
+<path d="M3.5 0L21.5 0A3.5 3.5 0 0 1 25 3.5L25 10.5A3.5 3.5 0 0 1 21.5 14L3.5 14A3.5 3.5 0 0 1 0 10.5L0 3.5A3.5 3.5 0 0 1 3.5 0" transform="translate(366.5 280)" fill="#0b5ca8" stroke="#fff" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" stroke-linejoin="round" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="legend" ecmeta_silent="true" class="zr0-cls-5"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" x="30" y="7" transform="translate(366.5 280)" fill="#333">国家级</text>
+<path d="M-1 -1l64 0l0 16l-64 0Z" transform="translate(366.5 280)" fill="transparent" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="legend" class="zr0-cls-6"></path>
+<path d="M3.5 0L21.5 0A3.5 3.5 0 0 1 25 3.5L25 10.5A3.5 3.5 0 0 1 21.5 14L3.5 14A3.5 3.5 0 0 1 0 10.5L0 3.5A3.5 3.5 0 0 1 3.5 0" transform="translate(440.5 280)" fill="#0284c7" stroke="#fff" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" stroke-linejoin="round" ecmeta_series_index="0" ecmeta_data_index="1" ecmeta_ssr_type="legend" ecmeta_silent="true" class="zr0-cls-5"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" x="30" y="7" transform="translate(440.5 280)" fill="#333">省级</text>
+<path d="M-1 -1l53 0l0 16l-53 0Z" transform="translate(440.5 280)" fill="transparent" ecmeta_series_index="0" ecmeta_data_index="1" ecmeta_ssr_type="legend" class="zr0-cls-6"></path>
+<path d="M3.5 0L21.5 0A3.5 3.5 0 0 1 25 3.5L25 10.5A3.5 3.5 0 0 1 21.5 14L3.5 14A3.5 3.5 0 0 1 0 10.5L0 3.5A3.5 3.5 0 0 1 3.5 0" transform="translate(503.5 280)" fill="#0b3768" stroke="#fff" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" stroke-linejoin="round" ecmeta_series_index="0" ecmeta_data_index="2" ecmeta_ssr_type="legend" ecmeta_silent="true" class="zr0-cls-5"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" x="30" y="7" transform="translate(503.5 280)" fill="#333">市级</text>
+<path d="M-1 -1l53 0l0 16l-53 0Z" transform="translate(503.5 280)" fill="transparent" ecmeta_series_index="0" ecmeta_data_index="2" ecmeta_ssr_type="legend" class="zr0-cls-6"></path>
+<path d="M3.5 0L21.5 0A3.5 3.5 0 0 1 25 3.5L25 10.5A3.5 3.5 0 0 1 21.5 14L3.5 14A3.5 3.5 0 0 1 0 10.5L0 3.5A3.5 3.5 0 0 1 3.5 0" transform="translate(566.5 280)" fill="#d97706" stroke="#fff" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" stroke-linejoin="round" ecmeta_series_index="0" ecmeta_data_index="3" ecmeta_ssr_type="legend" ecmeta_silent="true" class="zr0-cls-5"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" x="30" y="7" transform="translate(566.5 280)" fill="#333">区级</text>
+<path d="M-1 -1l53 0l0 16l-53 0Z" transform="translate(566.5 280)" fill="transparent" ecmeta_series_index="0" ecmeta_data_index="3" ecmeta_ssr_type="legend" class="zr0-cls-6"></path>
+<style ><![CDATA[
+.zr0-cls-0:hover {
+cursor:pointer;
+}
+.zr0-cls-1:hover {
+cursor:pointer;
+fill:rgba(12,101,184,1);
+}
+.zr0-cls-2:hover {
+cursor:pointer;
+fill:rgba(2,145,218,1);
+}
+.zr0-cls-3:hover {
+cursor:pointer;
+fill:rgba(12,60,114,1);
+}
+.zr0-cls-4:hover {
+cursor:pointer;
+fill:rgba(238,130,6,1);
+}
+.zr0-cls-5:hover {
+pointer-events:none;
+}
+.zr0-cls-6:hover {
+cursor:pointer;
+fill:rgba(0,0,0,0);
+}
+
+]]>
+
+</style>
+</svg></div><div class="chart-canvas" data-chart="pie" data-spec="{&quot;type&quot;:&quot;pie&quot;,&quot;donut&quot;:true,&quot;data&quot;:[{&quot;name&quot;:&quot;国家级&quot;,&quot;value&quot;:13.0},{&quot;name&quot;:&quot;省级&quot;,&quot;value&quot;:14.0},{&quot;name&quot;:&quot;市级&quot;,&quot;value&quot;:20.0},{&quot;name&quot;:&quot;区级&quot;,&quot;value&quot;:15.0}]}"></div><p class="chart-status" aria-live="polite"></p></div><details class="chart-data"><summary>数据明细</summary><div class="table-wrap"><table><thead><tr><th>层级</th><th>项目数</th></tr></thead><tbody><tr><td>国家级</td><td>13</td></tr><tr><td>省级</td><td>14</td></tr><tr><td>市级</td><td>20</td></tr><tr><td>区级</td><td>15</td></tr></tbody></table></div></details></div>
+<p class="biz-section-note">按主管机构统计获批项目数量</p><div class="chart-box"><h4 class="chart-title">项目归口分布</h4><div class="chart-frame" data-chart-state="static"><div class="chart-static"><svg width="984" height="300" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" baseProfile="full" viewBox="0 0 984 300">
+<rect width="984" height="300" x="0" y="0" fill="none"></rect>
+<path d="M48 260.5L960 260.5" fill="transparent" stroke="#E0E6F1" class="zr1-cls-7"></path>
+<path d="M48 221.5L960 221.5" fill="transparent" stroke="#E0E6F1" class="zr1-cls-7"></path>
+<path d="M48 183.5L960 183.5" fill="transparent" stroke="#E0E6F1" class="zr1-cls-7"></path>
+<path d="M48 145.5L960 145.5" fill="transparent" stroke="#E0E6F1" class="zr1-cls-7"></path>
+<path d="M48 106.5L960 106.5" fill="transparent" stroke="#E0E6F1" class="zr1-cls-7"></path>
+<path d="M48 68.5L960 68.5" fill="transparent" stroke="#E0E6F1" class="zr1-cls-7"></path>
+<path d="M48 30.5L960 30.5" fill="transparent" stroke="#E0E6F1" class="zr1-cls-7"></path>
+<path d="M48 260.5L960 260.5" fill="transparent" stroke="#6E7079" stroke-linecap="round" class="zr1-cls-7"></path>
+<path d="M48.5 260L48.5 265" fill="transparent" stroke="#6E7079" class="zr1-cls-7"></path>
+<path d="M84.5 260L84.5 265" fill="transparent" stroke="#6E7079" class="zr1-cls-7"></path>
+<path d="M121.5 260L121.5 265" fill="transparent" stroke="#6E7079" class="zr1-cls-7"></path>
+<path d="M157.5 260L157.5 265" fill="transparent" stroke="#6E7079" class="zr1-cls-7"></path>
+<path d="M194.5 260L194.5 265" fill="transparent" stroke="#6E7079" class="zr1-cls-7"></path>
+<path d="M230.5 260L230.5 265" fill="transparent" stroke="#6E7079" class="zr1-cls-7"></path>
+<path d="M267.5 260L267.5 265" fill="transparent" stroke="#6E7079" class="zr1-cls-7"></path>
+<path d="M303.5 260L303.5 265" fill="transparent" stroke="#6E7079" class="zr1-cls-7"></path>
+<path d="M340.5 260L340.5 265" fill="transparent" stroke="#6E7079" class="zr1-cls-7"></path>
+<path d="M376.5 260L376.5 265" fill="transparent" stroke="#6E7079" class="zr1-cls-7"></path>
+<path d="M413.5 260L413.5 265" fill="transparent" stroke="#6E7079" class="zr1-cls-7"></path>
+<path d="M449.5 260L449.5 265" fill="transparent" stroke="#6E7079" class="zr1-cls-7"></path>
+<path d="M486.5 260L486.5 265" fill="transparent" stroke="#6E7079" class="zr1-cls-7"></path>
+<path d="M522.5 260L522.5 265" fill="transparent" stroke="#6E7079" class="zr1-cls-7"></path>
+<path d="M558.5 260L558.5 265" fill="transparent" stroke="#6E7079" class="zr1-cls-7"></path>
+<path d="M595.5 260L595.5 265" fill="transparent" stroke="#6E7079" class="zr1-cls-7"></path>
+<path d="M631.5 260L631.5 265" fill="transparent" stroke="#6E7079" class="zr1-cls-7"></path>
+<path d="M668.5 260L668.5 265" fill="transparent" stroke="#6E7079" class="zr1-cls-7"></path>
+<path d="M704.5 260L704.5 265" fill="transparent" stroke="#6E7079" class="zr1-cls-7"></path>
+<path d="M741.5 260L741.5 265" fill="transparent" stroke="#6E7079" class="zr1-cls-7"></path>
+<path d="M777.5 260L777.5 265" fill="transparent" stroke="#6E7079" class="zr1-cls-7"></path>
+<path d="M814.5 260L814.5 265" fill="transparent" stroke="#6E7079" class="zr1-cls-7"></path>
+<path d="M850.5 260L850.5 265" fill="transparent" stroke="#6E7079" class="zr1-cls-7"></path>
+<path d="M887.5 260L887.5 265" fill="transparent" stroke="#6E7079" class="zr1-cls-7"></path>
+<path d="M923.5 260L923.5 265" fill="transparent" stroke="#6E7079" class="zr1-cls-7"></path>
+<path d="M960.5 260L960.5 265" fill="transparent" stroke="#6E7079" class="zr1-cls-7"></path>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 260)" fill="#334155">0</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 221.6667)" fill="#334155">2</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 183.3333)" fill="#334155">4</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 145)" fill="#334155">6</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 106.6667)" fill="#334155">8</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 68.3333)" fill="#334155">10</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 30)" fill="#334155">12</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="matrix(0.819,-0.574,0.574,0.819,66.24,268)" fill="#334155">中华人民共和国国家发展和改革委员会</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="matrix(0.819,-0.574,0.574,0.819,102.72,268)" fill="#334155">中国质量协会</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="matrix(0.819,-0.574,0.574,0.819,139.2,268)" fill="#334155">北京市科学技术委员会</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="matrix(0.819,-0.574,0.574,0.819,175.68,268)" fill="#334155">四川省农业农村厅</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="matrix(0.819,-0.574,0.574,0.819,212.16,268)" fill="#334155">四川省科学技术厅</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="matrix(0.819,-0.574,0.574,0.819,248.64,268)" fill="#334155">国家市场监督管理总局</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="matrix(0.819,-0.574,0.574,0.819,285.12,268)" fill="#334155">国家知识产权局</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="matrix(0.819,-0.574,0.574,0.819,321.6,268)" fill="#334155">广东省市场监督管理局（知识产权局）</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="matrix(0.819,-0.574,0.574,0.819,358.08,268)" fill="#334155">江苏省人力资源社会保障厅</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="matrix(0.819,-0.574,0.574,0.819,394.56,268)" fill="#334155">江苏省科学技术厅</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="matrix(0.819,-0.574,0.574,0.819,431.04,268)" fill="#334155">深圳市人力资源和社会保障局</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="matrix(0.819,-0.574,0.574,0.819,467.52,268)" fill="#334155">深圳市商务局</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="matrix(0.819,-0.574,0.574,0.819,504,268)" fill="#334155">深圳市工业和信息化局</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="matrix(0.819,-0.574,0.574,0.819,540.48,268)" fill="#334155">深圳市市场监督管理局</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="matrix(0.819,-0.574,0.574,0.819,576.96,268)" fill="#334155">深圳市市场监督管理局（深圳市知识产权局）</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="matrix(0.819,-0.574,0.574,0.819,613.44,268)" fill="#334155">深圳市科技创新委员会</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="matrix(0.819,-0.574,0.574,0.819,649.92,268)" fill="#334155">深圳市龙岗区科技创新局</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="matrix(0.819,-0.574,0.574,0.819,686.4,268)" fill="#334155">湖北省科学技术厅</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="matrix(0.819,-0.574,0.574,0.819,722.88,268)" fill="#334155">湖南省工业和信息化厅</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="matrix(0.819,-0.574,0.574,0.819,759.36,268)" fill="#334155">龙岗区人力资源局</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="matrix(0.819,-0.574,0.574,0.819,795.84,268)" fill="#334155">龙岗区科技创新局</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="matrix(0.819,-0.574,0.574,0.819,832.32,268)" fill="#334155">广东省科学技术厅</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="matrix(0.819,-0.574,0.574,0.819,868.8,268)" fill="#334155">广东省发展和改革委员会</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="matrix(0.819,-0.574,0.574,0.819,905.28,268)" fill="#334155">广东省工业和信息化厅</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="matrix(0.819,-0.574,0.574,0.819,941.76,268)" fill="#334155">深圳市发展和改革委员会</text>
+<path d="M53.7 260l25.2 0l0 -19.2l-25.2 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="chart" class="zr1-cls-8"></path>
+<path d="M90.1 260l25.2 0l0 -19.2l-25.2 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="1" ecmeta_ssr_type="chart" class="zr1-cls-8"></path>
+<path d="M126.6 260l25.2 0l0 -38.3l-25.2 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="2" ecmeta_ssr_type="chart" class="zr1-cls-8"></path>
+<path d="M163.1 260l25.2 0l0 -19.2l-25.2 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="3" ecmeta_ssr_type="chart" class="zr1-cls-8"></path>
+<path d="M199.6 260l25.2 0l0 -19.2l-25.2 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="4" ecmeta_ssr_type="chart" class="zr1-cls-8"></path>
+<path d="M236.1 260l25.2 0l0 -19.2l-25.2 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="5" ecmeta_ssr_type="chart" class="zr1-cls-8"></path>
+<path d="M272.5 260l25.2 0l0 -38.3l-25.2 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="6" ecmeta_ssr_type="chart" class="zr1-cls-8"></path>
+<path d="M309 260l25.2 0l0 -95.8l-25.2 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="7" ecmeta_ssr_type="chart" class="zr1-cls-8"></path>
+<path d="M345.5 260l25.2 0l0 -19.2l-25.2 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="8" ecmeta_ssr_type="chart" class="zr1-cls-8"></path>
+<path d="M382 260l25.2 0l0 -19.2l-25.2 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="9" ecmeta_ssr_type="chart" class="zr1-cls-8"></path>
+<path d="M418.5 260l25.2 0l0 -230l-25.2 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="10" ecmeta_ssr_type="chart" class="zr1-cls-8"></path>
+<path d="M454.9 260l25.2 0l0 -19.2l-25.2 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="11" ecmeta_ssr_type="chart" class="zr1-cls-8"></path>
+<path d="M491.4 260l25.2 0l0 -38.3l-25.2 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="12" ecmeta_ssr_type="chart" class="zr1-cls-8"></path>
+<path d="M527.9 260l25.2 0l0 -19.2l-25.2 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="13" ecmeta_ssr_type="chart" class="zr1-cls-8"></path>
+<path d="M564.4 260l25.2 0l0 -19.2l-25.2 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="14" ecmeta_ssr_type="chart" class="zr1-cls-8"></path>
+<path d="M600.9 260l25.2 0l0 -134.2l-25.2 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="15" ecmeta_ssr_type="chart" class="zr1-cls-8"></path>
+<path d="M637.3 260l25.2 0l0 -76.7l-25.2 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="16" ecmeta_ssr_type="chart" class="zr1-cls-8"></path>
+<path d="M673.8 260l25.2 0l0 -19.2l-25.2 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="17" ecmeta_ssr_type="chart" class="zr1-cls-8"></path>
+<path d="M710.3 260l25.2 0l0 -19.2l-25.2 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="18" ecmeta_ssr_type="chart" class="zr1-cls-8"></path>
+<path d="M746.8 260l25.2 0l0 -115l-25.2 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="19" ecmeta_ssr_type="chart" class="zr1-cls-8"></path>
+<path d="M783.3 260l25.2 0l0 -76.7l-25.2 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="20" ecmeta_ssr_type="chart" class="zr1-cls-8"></path>
+<path d="M819.7 260l25.2 0l0 -19.2l-25.2 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="21" ecmeta_ssr_type="chart" class="zr1-cls-8"></path>
+<path d="M856.2 260l25.2 0l0 -19.2l-25.2 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="22" ecmeta_ssr_type="chart" class="zr1-cls-8"></path>
+<path d="M892.7 260l25.2 0l0 -38.3l-25.2 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="23" ecmeta_ssr_type="chart" class="zr1-cls-8"></path>
+<path d="M929.2 260l25.2 0l0 -19.2l-25.2 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="24" ecmeta_ssr_type="chart" class="zr1-cls-8"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(66.24 235.8333)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">1</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(102.72 235.8333)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">1</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(139.2 216.6667)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">2</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(175.68 235.8333)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">1</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(212.16 235.8333)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">1</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(248.64 235.8333)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">1</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(285.12 216.6667)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">2</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(321.6 159.1667)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">5</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(358.08 235.8333)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">1</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(394.56 235.8333)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">1</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(431.04 25)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">12</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(467.52 235.8333)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">1</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(504 216.6667)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">2</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(540.48 235.8333)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">1</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(576.96 235.8333)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">1</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(613.44 120.8333)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">7</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(649.92 178.3333)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">4</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(686.4 235.8333)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">1</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(722.88 235.8333)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">1</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(759.36 140)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">6</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(795.84 178.3333)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">4</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(832.32 235.8333)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">1</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(868.8 235.8333)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">1</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(905.28 216.6667)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">2</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(941.76 235.8333)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">1</text>
+<path d="M-5 -5l10 0l0 10l-10 0Z" transform="translate(492 5)" fill="rgb(0,0,0)" fill-opacity="0" stroke="#ccc" stroke-width="0" class="zr1-cls-7"></path>
+<style ><![CDATA[
+.zr1-cls-7:hover {
+pointer-events:none;
+}
+.zr1-cls-8:hover {
+cursor:pointer;
+fill:rgba(12,101,184,1);
+}
+
+]]>
+
+</style>
+</svg></div><div class="chart-canvas" data-chart="bar" data-spec="{&quot;type&quot;:&quot;bar&quot;,&quot;orient&quot;:&quot;v&quot;,&quot;names&quot;:[&quot;中华人民共和国国家发展和改革委员会&quot;,&quot;中国质量协会&quot;,&quot;北京市科学技术委员会&quot;,&quot;四川省农业农村厅&quot;,&quot;四川省科学技术厅&quot;,&quot;国家市场监督管理总局&quot;,&quot;国家知识产权局&quot;,&quot;广东省市场监督管理局（知识产权局）&quot;,&quot;江苏省人力资源社会保障厅&quot;,&quot;江苏省科学技术厅&quot;,&quot;深圳市人力资源和社会保障局&quot;,&quot;深圳市商务局&quot;,&quot;深圳市工业和信息化局&quot;,&quot;深圳市市场监督管理局&quot;,&quot;深圳市市场监督管理局（深圳市知识产权局）&quot;,&quot;深圳市科技创新委员会&quot;,&quot;深圳市龙岗区科技创新局&quot;,&quot;湖北省科学技术厅&quot;,&quot;湖南省工业和信息化厅&quot;,&quot;龙岗区人力资源局&quot;,&quot;龙岗区科技创新局&quot;,&quot;广东省科学技术厅&quot;,&quot;广东省发展和改革委员会&quot;,&quot;广东省工业和信息化厅&quot;,&quot;深圳市发展和改革委员会&quot;],&quot;values&quot;:[1.0,1.0,2.0,1.0,1.0,1.0,2.0,5.0,1.0,1.0,12.0,1.0,2.0,1.0,1.0,7.0,4.0,1.0,1.0,6.0,4.0,1.0,1.0,2.0,1.0]}"></div><p class="chart-status" aria-live="polite"></p></div><details class="chart-data"><summary>数据明细</summary><div class="table-wrap"><table><thead><tr><th>主管机构</th><th>项目数量</th></tr></thead><tbody><tr><td>中华人民共和国国家发展和改革委员会</td><td>1</td></tr><tr><td>中国质量协会</td><td>1</td></tr><tr><td>北京市科学技术委员会</td><td>2</td></tr><tr><td>四川省农业农村厅</td><td>1</td></tr><tr><td>四川省科学技术厅</td><td>1</td></tr><tr><td>国家市场监督管理总局</td><td>1</td></tr><tr><td>国家知识产权局</td><td>2</td></tr><tr><td>广东省市场监督管理局（知识产权局）</td><td>5</td></tr><tr><td>江苏省人力资源社会保障厅</td><td>1</td></tr><tr><td>江苏省科学技术厅</td><td>1</td></tr><tr><td>深圳市人力资源和社会保障局</td><td>12</td></tr><tr><td>深圳市商务局</td><td>1</td></tr><tr><td>深圳市工业和信息化局</td><td>2</td></tr><tr><td>深圳市市场监督管理局</td><td>1</td></tr><tr><td>深圳市市场监督管理局（深圳市知识产权局）</td><td>1</td></tr><tr><td>深圳市科技创新委员会</td><td>7</td></tr><tr><td>深圳市龙岗区科技创新局</td><td>4</td></tr><tr><td>湖北省科学技术厅</td><td>1</td></tr><tr><td>湖南省工业和信息化厅</td><td>1</td></tr><tr><td>龙岗区人力资源局</td><td>6</td></tr><tr><td>龙岗区科技创新局</td><td>4</td></tr><tr><td>广东省科学技术厅</td><td>1</td></tr><tr><td>广东省发展和改革委员会</td><td>1</td></tr><tr><td>广东省工业和信息化厅</td><td>2</td></tr><tr><td>深圳市发展和改革委员会</td><td>1</td></tr></tbody></table></div></details></div>
+<p class="biz-section-note">按年度统计获批项目数量</p><div class="chart-box"><h4 class="chart-title">获批项目趋势</h4><div class="chart-frame" data-chart-state="static"><div class="chart-static"><svg width="984" height="300" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" baseProfile="full" viewBox="0 0 984 300">
+<rect width="984" height="300" x="0" y="0" fill="none"></rect>
+<path d="M48 260.5L960 260.5" fill="transparent" stroke="#E0E6F1" class="zr2-cls-9"></path>
+<path d="M48 221.5L960 221.5" fill="transparent" stroke="#E0E6F1" class="zr2-cls-9"></path>
+<path d="M48 183.5L960 183.5" fill="transparent" stroke="#E0E6F1" class="zr2-cls-9"></path>
+<path d="M48 145.5L960 145.5" fill="transparent" stroke="#E0E6F1" class="zr2-cls-9"></path>
+<path d="M48 106.5L960 106.5" fill="transparent" stroke="#E0E6F1" class="zr2-cls-9"></path>
+<path d="M48 68.5L960 68.5" fill="transparent" stroke="#E0E6F1" class="zr2-cls-9"></path>
+<path d="M48 30.5L960 30.5" fill="transparent" stroke="#E0E6F1" class="zr2-cls-9"></path>
+<path d="M48 260.5L960 260.5" fill="transparent" stroke="#6E7079" stroke-linecap="round" class="zr2-cls-9"></path>
+<path d="M48.5 260L48.5 265" fill="transparent" stroke="#6E7079" class="zr2-cls-9"></path>
+<path d="M230.5 260L230.5 265" fill="transparent" stroke="#6E7079" class="zr2-cls-9"></path>
+<path d="M413.5 260L413.5 265" fill="transparent" stroke="#6E7079" class="zr2-cls-9"></path>
+<path d="M595.5 260L595.5 265" fill="transparent" stroke="#6E7079" class="zr2-cls-9"></path>
+<path d="M777.5 260L777.5 265" fill="transparent" stroke="#6E7079" class="zr2-cls-9"></path>
+<path d="M960.5 260L960.5 265" fill="transparent" stroke="#6E7079" class="zr2-cls-9"></path>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 260)" fill="#334155">0</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 221.6667)" fill="#334155">3</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 183.3333)" fill="#334155">6</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 145)" fill="#334155">9</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 106.6667)" fill="#334155">12</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 68.3333)" fill="#334155">15</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 30)" fill="#334155">18</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="5.5" transform="translate(139.2 268)" fill="#334155">2019</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="5.5" transform="translate(321.6 268)" fill="#334155">2020</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="5.5" transform="translate(504 268)" fill="#334155">2021</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="5.5" transform="translate(686.4 268)" fill="#334155">2022</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="5.5" transform="translate(868.8 268)" fill="#334155">2023</text>
+<g clip-path="url(#static-chart-2-zr2-c0)">
+<path d="M139.2 145C139.2 145 239 170.6 321.6 170.6C421.4 170.6 403.7 42.8 504 42.8C586.1 42.8 613.5 42.8 686.4 42.8C795.9 42.8 868.8 247.2 868.8 247.2L868.8 260L686.4 260L504 260L321.6 260L139.2 260Z" fill="#0b5ca8" fill-opacity="0.18" class="zr2-cls-11"></path>
+<path d="M139.2 145C139.2 145 239 170.6 321.6 170.6C421.4 170.6 403.7 42.8 504 42.8C586.1 42.8 613.5 42.8 686.4 42.8C795.9 42.8 868.8 247.2 868.8 247.2" fill="transparent" stroke="#0b5ca8" stroke-width="2" stroke-linejoin="bevel" class="zr2-cls-12"></path>
+</g>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,139.2,145)" fill="#fff" stroke="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="chart" class="zr2-cls-13"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,321.6,170.5556)" fill="#fff" stroke="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="1" ecmeta_ssr_type="chart" class="zr2-cls-13"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,504,42.7778)" fill="#fff" stroke="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="2" ecmeta_ssr_type="chart" class="zr2-cls-13"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,686.4,42.7778)" fill="#fff" stroke="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="3" ecmeta_ssr_type="chart" class="zr2-cls-13"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,868.8,247.2222)" fill="#fff" stroke="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="4" ecmeta_ssr_type="chart" class="zr2-cls-13"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(139.2 137)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">9</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(321.6 162.5556)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">7</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(504 34.7778)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">17</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(686.4 34.7778)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">17</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(868.8 239.2222)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">1</text>
+<path d="M-5 -5l107 0l0 23.2l-107 0Z" transform="translate(443.5 5)" fill="rgb(0,0,0)" fill-opacity="0" stroke="#ccc" stroke-width="0" class="zr2-cls-9"></path>
+<path d="M0 7L25 7" transform="translate(444.5 4.6)" fill="#000" stroke="#0b5ca8" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr2-cls-9"></path>
+<path d="M18.1 7A5.6 5.6 0 1 1 18.1 6.4A5.6 5.6 0 0 1 18.1 7" transform="translate(444.5 4.6)" fill="#fff" stroke="#0b5ca8" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr2-cls-9"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" x="30" y="7" transform="translate(444.5 4.6)" fill="#333">获批项目趋势</text>
+<path d="M-1 0.4l97 0l0 13.2l-97 0Z" transform="translate(444.5 4.6)" fill="transparent" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="legend" class="zr2-cls-14"></path>
+<defs >
+<clipPath id="static-chart-2-zr2-c0">
+<path d="M47 29l914 0l0 232l-914 0Z" fill="#000" class="zr2-cls-10"></path>
+</clipPath>
+</defs>
+<style ><![CDATA[
+.zr2-cls-9:hover {
+pointer-events:none;
+}
+.zr2-cls-10:hover {
+cursor:pointer;
+fill:rgba(0,0,0,1);
+}
+.zr2-cls-11:hover {
+cursor:pointer;
+fill:rgba(12,101,184,1);
+}
+.zr2-cls-12:hover {
+cursor:pointer;
+}
+.zr2-cls-13:hover {
+cursor:pointer;
+fill:rgba(255,255,255,1);
+}
+.zr2-cls-14:hover {
+cursor:pointer;
+fill:rgba(0,0,0,0);
+}
+
+]]>
+
+</style>
+</svg></div><div class="chart-canvas" data-chart="line" data-spec="{&quot;type&quot;:&quot;line&quot;,&quot;area&quot;:true,&quot;x&quot;:[&quot;2019&quot;,&quot;2020&quot;,&quot;2021&quot;,&quot;2022&quot;,&quot;2023&quot;],&quot;series&quot;:[{&quot;name&quot;:&quot;获批项目趋势&quot;,&quot;data&quot;:[9.0,7.0,17.0,17.0,1.0]}]}"></div><p class="chart-status" aria-live="polite"></p></div><details class="chart-data"><summary>数据明细</summary><div class="table-wrap"><table><thead><tr><th>年份</th><th>获批项目数</th></tr></thead><tbody><tr><td>2019</td><td>9</td></tr><tr><td>2020</td><td>7</td></tr><tr><td>2021</td><td>17</td></tr><tr><td>2022</td><td>17</td></tr><tr><td>2023</td><td>1</td></tr></tbody></table></div></details></div>
+<p class="biz-section-note">仅按标题确认且去重的当前页样本统计政策类型</p><div class="chart-box"><h4 class="chart-title">政策类型分布</h4><div class="chart-frame" data-chart-state="static"><div class="chart-static"><svg width="984" height="300" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" baseProfile="full" viewBox="0 0 984 300">
+<rect width="984" height="300" x="0" y="0" fill="none"></rect>
+<polyline points="589 196.5 603.3 201.2 618.3 201.2" fill="transparent" stroke="#0b5ca8" class="zr3-cls-15"></polyline>
+<polyline points="395 196.5 380.7 201.2 365.7 201.2" fill="transparent" stroke="#0284c7" class="zr3-cls-15"></polyline>
+<polyline points="432 82.5 423.2 70.3 408.2 70.3" fill="transparent" stroke="#0b3768" class="zr3-cls-15"></polyline>
+<path d="M492 63A102 102 0 1 1 432 247.5L455 216A63 63 0 1 0 492 102Z" fill="#0b5ca8" stroke="#fff" stroke-width="2" stroke-linejoin="round" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="chart" class="zr3-cls-16"></path>
+<path d="M432 247.5A102 102 0 0 1 395 133.5L432.1 145.5A63 63 0 0 0 455 216Z" fill="#0284c7" stroke="#fff" stroke-width="2" stroke-linejoin="round" ecmeta_series_index="0" ecmeta_data_index="1" ecmeta_ssr_type="chart" class="zr3-cls-17"></path>
+<path d="M395 133.5A102 102 0 0 1 492 63L492 102A63 63 0 0 0 432.1 145.5Z" fill="#0b3768" stroke="#fff" stroke-width="2" stroke-linejoin="round" ecmeta_series_index="0" ecmeta_data_index="2" ecmeta_ssr_type="chart" class="zr3-cls-18"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" xml:space="preserve" transform="translate(623.2736 201.155)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">申报指南: 3 (60%)</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" xml:space="preserve" transform="translate(360.7264 201.155)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">其他政策: 1 (20%)</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" xml:space="preserve" transform="translate(403.2291 70.345)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">公示公开: 1 (20%)</text>
+<path d="M-5 -5l255 0l0 26l-255 0Z" transform="translate(369.5 279)" fill="rgb(0,0,0)" fill-opacity="0" stroke="#ccc" stroke-width="0" class="zr3-cls-19"></path>
+<path d="M3.5 0L21.5 0A3.5 3.5 0 0 1 25 3.5L25 10.5A3.5 3.5 0 0 1 21.5 14L3.5 14A3.5 3.5 0 0 1 0 10.5L0 3.5A3.5 3.5 0 0 1 3.5 0" transform="translate(370.5 280)" fill="#0b5ca8" stroke="#fff" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" stroke-linejoin="round" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="legend" ecmeta_silent="true" class="zr3-cls-19"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" x="30" y="7" transform="translate(370.5 280)" fill="#333">申报指南</text>
+<path d="M-1 -1l75 0l0 16l-75 0Z" transform="translate(370.5 280)" fill="transparent" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="legend" class="zr3-cls-20"></path>
+<path d="M3.5 0L21.5 0A3.5 3.5 0 0 1 25 3.5L25 10.5A3.5 3.5 0 0 1 21.5 14L3.5 14A3.5 3.5 0 0 1 0 10.5L0 3.5A3.5 3.5 0 0 1 3.5 0" transform="translate(455.5 280)" fill="#0284c7" stroke="#fff" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" stroke-linejoin="round" ecmeta_series_index="0" ecmeta_data_index="1" ecmeta_ssr_type="legend" ecmeta_silent="true" class="zr3-cls-19"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" x="30" y="7" transform="translate(455.5 280)" fill="#333">其他政策</text>
+<path d="M-1 -1l75 0l0 16l-75 0Z" transform="translate(455.5 280)" fill="transparent" ecmeta_series_index="0" ecmeta_data_index="1" ecmeta_ssr_type="legend" class="zr3-cls-20"></path>
+<path d="M3.5 0L21.5 0A3.5 3.5 0 0 1 25 3.5L25 10.5A3.5 3.5 0 0 1 21.5 14L3.5 14A3.5 3.5 0 0 1 0 10.5L0 3.5A3.5 3.5 0 0 1 3.5 0" transform="translate(540.5 280)" fill="#0b3768" stroke="#fff" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" stroke-linejoin="round" ecmeta_series_index="0" ecmeta_data_index="2" ecmeta_ssr_type="legend" ecmeta_silent="true" class="zr3-cls-19"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" x="30" y="7" transform="translate(540.5 280)" fill="#333">公示公开</text>
+<path d="M-1 -1l75 0l0 16l-75 0Z" transform="translate(540.5 280)" fill="transparent" ecmeta_series_index="0" ecmeta_data_index="2" ecmeta_ssr_type="legend" class="zr3-cls-20"></path>
+<style ><![CDATA[
+.zr3-cls-15:hover {
+cursor:pointer;
+}
+.zr3-cls-16:hover {
+cursor:pointer;
+fill:rgba(12,101,184,1);
+}
+.zr3-cls-17:hover {
+cursor:pointer;
+fill:rgba(2,145,218,1);
+}
+.zr3-cls-18:hover {
+cursor:pointer;
+fill:rgba(12,60,114,1);
+}
+.zr3-cls-19:hover {
+pointer-events:none;
+}
+.zr3-cls-20:hover {
+cursor:pointer;
+fill:rgba(0,0,0,0);
+}
+
+]]>
+
+</style>
+</svg></div><div class="chart-canvas" data-chart="pie" data-spec="{&quot;type&quot;:&quot;pie&quot;,&quot;donut&quot;:true,&quot;data&quot;:[{&quot;name&quot;:&quot;申报指南&quot;,&quot;value&quot;:3.0},{&quot;name&quot;:&quot;其他政策&quot;,&quot;value&quot;:1.0},{&quot;name&quot;:&quot;公示公开&quot;,&quot;value&quot;:1.0}]}"></div><p class="chart-status" aria-live="polite"></p></div><details class="chart-data"><summary>数据明细</summary><div class="table-wrap"><table><thead><tr><th>政策类型</th><th>数量</th></tr></thead><tbody><tr><td>申报指南</td><td>3</td></tr><tr><td>其他政策</td><td>1</td></tr><tr><td>公示公开</td><td>1</td></tr></tbody></table></div></details></div>
+<p class="biz-section-note">仅对标题确认且去重样本的正文(pnText)做子主题词统计</p><div class="chart-box"><h4 class="chart-title">政策主题词频</h4><div class="chart-frame" data-chart-state="static"><div class="chart-static"><svg width="984" height="300" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" baseProfile="full" viewBox="0 0 984 300">
+<rect width="984" height="300" x="0" y="0" fill="none"></rect>
+<path d="M48 260.5L960 260.5" fill="transparent" stroke="#E0E6F1" class="zr4-cls-21"></path>
+<path d="M48 221.5L960 221.5" fill="transparent" stroke="#E0E6F1" class="zr4-cls-21"></path>
+<path d="M48 183.5L960 183.5" fill="transparent" stroke="#E0E6F1" class="zr4-cls-21"></path>
+<path d="M48 145.5L960 145.5" fill="transparent" stroke="#E0E6F1" class="zr4-cls-21"></path>
+<path d="M48 106.5L960 106.5" fill="transparent" stroke="#E0E6F1" class="zr4-cls-21"></path>
+<path d="M48 68.5L960 68.5" fill="transparent" stroke="#E0E6F1" class="zr4-cls-21"></path>
+<path d="M48 30.5L960 30.5" fill="transparent" stroke="#E0E6F1" class="zr4-cls-21"></path>
+<path d="M48 260.5L960 260.5" fill="transparent" stroke="#6E7079" stroke-linecap="round" class="zr4-cls-21"></path>
+<path d="M48.5 260L48.5 265" fill="transparent" stroke="#6E7079" class="zr4-cls-21"></path>
+<path d="M352.5 260L352.5 265" fill="transparent" stroke="#6E7079" class="zr4-cls-21"></path>
+<path d="M656.5 260L656.5 265" fill="transparent" stroke="#6E7079" class="zr4-cls-21"></path>
+<path d="M960.5 260L960.5 265" fill="transparent" stroke="#6E7079" class="zr4-cls-21"></path>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 260)" fill="#334155">0</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 221.6667)" fill="#334155">2</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 183.3333)" fill="#334155">4</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 145)" fill="#334155">6</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 106.6667)" fill="#334155">8</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 68.3333)" fill="#334155">10</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 30)" fill="#334155">12</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="5.5" transform="translate(200 268)" fill="#334155">创新</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="5.5" transform="translate(504 268)" fill="#334155">技术</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="5.5" transform="translate(808 268)" fill="#334155">人才</text>
+<path d="M179 260l42 0l0 -210.8l-42 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="chart" class="zr4-cls-22"></path>
+<path d="M483 260l42 0l0 -172.5l-42 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="1" ecmeta_ssr_type="chart" class="zr4-cls-22"></path>
+<path d="M787 260l42 0l0 -19.2l-42 0Z" fill="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="2" ecmeta_ssr_type="chart" class="zr4-cls-22"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(200 44.1667)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">11</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(504 82.5)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">9</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(808 235.8333)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">1</text>
+<path d="M-5 -5l10 0l0 10l-10 0Z" transform="translate(492 5)" fill="rgb(0,0,0)" fill-opacity="0" stroke="#ccc" stroke-width="0" class="zr4-cls-21"></path>
+<style ><![CDATA[
+.zr4-cls-21:hover {
+pointer-events:none;
+}
+.zr4-cls-22:hover {
+cursor:pointer;
+fill:rgba(12,101,184,1);
+}
+
+]]>
+
+</style>
+</svg></div><div class="chart-canvas" data-chart="bar" data-spec="{&quot;type&quot;:&quot;bar&quot;,&quot;orient&quot;:&quot;v&quot;,&quot;names&quot;:[&quot;创新&quot;,&quot;技术&quot;,&quot;人才&quot;],&quot;values&quot;:[11.0,9.0,1.0]}"></div><p class="chart-status" aria-live="polite"></p></div><details class="chart-data"><summary>数据明细</summary><div class="table-wrap"><table><thead><tr><th>主题词</th><th>出现次数</th></tr></thead><tbody><tr><td>创新</td><td>11</td></tr><tr><td>技术</td><td>9</td></tr><tr><td>人才</td><td>1</td></tr></tbody></table></div></details></div>
+<p class="biz-section-note">仅按标题确认且去重样本的发布月份统计</p><div class="chart-box"><h4 class="chart-title">政策发布时间趋势</h4><div class="chart-frame" data-chart-state="static"><div class="chart-static"><svg width="984" height="300" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" baseProfile="full" viewBox="0 0 984 300">
+<rect width="984" height="300" x="0" y="0" fill="none"></rect>
+<path d="M48 260.5L960 260.5" fill="transparent" stroke="#E0E6F1" class="zr5-cls-23"></path>
+<path d="M48 214.5L960 214.5" fill="transparent" stroke="#E0E6F1" class="zr5-cls-23"></path>
+<path d="M48 168.5L960 168.5" fill="transparent" stroke="#E0E6F1" class="zr5-cls-23"></path>
+<path d="M48 122.5L960 122.5" fill="transparent" stroke="#E0E6F1" class="zr5-cls-23"></path>
+<path d="M48 76.5L960 76.5" fill="transparent" stroke="#E0E6F1" class="zr5-cls-23"></path>
+<path d="M48 30.5L960 30.5" fill="transparent" stroke="#E0E6F1" class="zr5-cls-23"></path>
+<path d="M48 260.5L960 260.5" fill="transparent" stroke="#6E7079" stroke-linecap="round" class="zr5-cls-23"></path>
+<path d="M48.5 260L48.5 265" fill="transparent" stroke="#6E7079" class="zr5-cls-23"></path>
+<path d="M960.5 260L960.5 265" fill="transparent" stroke="#6E7079" class="zr5-cls-23"></path>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 260)" fill="#334155">0</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 214)" fill="#334155">1</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 168)" fill="#334155">2</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 122)" fill="#334155">3</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 76)" fill="#334155">4</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" transform="translate(40 30)" fill="#334155">5</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="5.5" transform="translate(504 268)" fill="#334155">2026-10</text>
+<g clip-path="url(#static-chart-5-zr5-c0)">
+<path d="M504 30L504 260Z" fill="#0b5ca8" fill-opacity="0.18" class="zr5-cls-25"></path>
+<path d="M504 30" fill="transparent" stroke="#0b5ca8" stroke-width="2" stroke-linejoin="bevel" class="zr5-cls-26"></path>
+</g>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2,0,0,2,504,30)" fill="#fff" stroke="#0b5ca8" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="chart" class="zr5-cls-27"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" y="-5.5" transform="translate(504 22)" fill="#333" stroke="rgb(255,255,255)" stroke-width="2" paint-order="stroke" stroke-miterlimit="2">5</text>
+<path d="M-5 -5l129 0l0 23.2l-129 0Z" transform="translate(432.5 5)" fill="rgb(0,0,0)" fill-opacity="0" stroke="#ccc" stroke-width="0" class="zr5-cls-23"></path>
+<path d="M0 7L25 7" transform="translate(433.5 4.6)" fill="#000" stroke="#0b5ca8" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr5-cls-23"></path>
+<path d="M18.1 7A5.6 5.6 0 1 1 18.1 6.4A5.6 5.6 0 0 1 18.1 7" transform="translate(433.5 4.6)" fill="#fff" stroke="#0b5ca8" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr5-cls-23"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;" x="30" y="7" transform="translate(433.5 4.6)" fill="#333">政策发布时间趋势</text>
+<path d="M-1 0.4l119 0l0 13.2l-119 0Z" transform="translate(433.5 4.6)" fill="transparent" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="legend" class="zr5-cls-28"></path>
+<defs >
+<clipPath id="static-chart-5-zr5-c0">
+<path d="M47 29l914 0l0 232l-914 0Z" fill="#000" class="zr5-cls-24"></path>
+</clipPath>
+</defs>
+<style ><![CDATA[
+.zr5-cls-23:hover {
+pointer-events:none;
+}
+.zr5-cls-24:hover {
+cursor:pointer;
+fill:rgba(0,0,0,1);
+}
+.zr5-cls-25:hover {
+cursor:pointer;
+fill:rgba(12,101,184,1);
+}
+.zr5-cls-26:hover {
+cursor:pointer;
+}
+.zr5-cls-27:hover {
+cursor:pointer;
+fill:rgba(255,255,255,1);
+}
+.zr5-cls-28:hover {
+cursor:pointer;
+fill:rgba(0,0,0,0);
+}
+
+]]>
+
+</style>
+</svg></div><div class="chart-canvas" data-chart="line" data-spec="{&quot;type&quot;:&quot;line&quot;,&quot;area&quot;:true,&quot;x&quot;:[&quot;2026-10&quot;],&quot;series&quot;:[{&quot;name&quot;:&quot;政策发布时间趋势&quot;,&quot;data&quot;:[5.0]}]}"></div><p class="chart-status" aria-live="polite"></p></div><details class="chart-data"><summary>数据明细</summary><div class="table-wrap"><table><thead><tr><th>月份</th><th>政策数量</th></tr></thead><tbody><tr><td>2026-10</td><td>5</td></tr></tbody></table></div></details></div>
+<h3 class="biz-subsection-title">检索相关性校验</h3><p class="biz-section-note">保留上游 total；主题聚合仅使用标题确认且按标题+机构+日期去重的当前页样本，正文命中仅作线索</p><div class="info-list"><div class="info-row"><span class="info-label">上游总数</span><span class="info-value">10000</span></div><div class="info-row"><span class="info-label">当前页样本数</span><span class="info-value">10</span></div><div class="info-row"><span class="info-label">标题确认样本数（含重复）</span><span class="info-value">6</span></div><div class="info-row"><span class="info-label">标题确认去重样本数</span><span class="info-value">5</span></div><div class="info-row"><span class="info-label">正文线索样本数</span><span class="info-value">4</span></div><div class="info-row"><span class="info-label">未命中样本数</span><span class="info-value">0</span></div><div class="info-row"><span class="info-label">重复样本数</span><span class="info-value">1</span></div></div>
 <h3 class="biz-subsection-title">政策检索明细</h3><p class="biz-section-note">上游命中 10000 条；当前页 10 条，标题确认相关去重样本 5 条</p><div class="table-wrap"><table><thead><tr><th>政策标题</th><th>发布机构</th><th>地区</th><th>政策类型</th><th>发布日期</th><th>相关性</th><th>命中位置</th><th>重复标记</th></tr></thead><tbody><tr><td>深圳市科技创新局关于发布《2026年深圳鲲鹏青年创业项目申请指南》的通知</td><td>罗湖区企业服务中心</td><td>广东省、深圳市、罗湖区</td><td>其他政策</td><td>2026-10-26</td><td>标题确认</td><td>标题+正文</td><td>-</td></tr><tr><td>深圳市科技创新局关于组织开展大型科研仪器实验人员技术课程的通知</td><td>深圳市科技创新委员会</td><td>广东省、深圳市</td><td>申报指南</td><td>2026-10-26</td><td>标题确认</td><td>标题+正文</td><td>-</td></tr><tr><td>深圳市科技创新局关于组织开展大型科研仪器实验人员技术课程的通知</td><td>深圳市科技创新委员会</td><td>广东省、深圳市</td><td>申报指南</td><td>2026-10-26</td><td>标题确认</td><td>标题+正文</td><td>重复样本</td></tr><tr><td>新郑市2026年11月份领导接访公告</td><td>郑州市新郑市市场监督管理局</td><td>河南省、郑州市、新郑市</td><td>其他政策</td><td>2026-10-26</td><td>正文线索</td><td>正文</td><td>-</td></tr><tr><td>深圳市科技创新局关于转发“脑科学与类脑研究”国家科技重大专项、“中韩青年科学家交流计划”等2个项目申报指南的通知</td><td>罗湖区企业服务中心</td><td>广东省、深圳市、罗湖区</td><td>申报指南</td><td>2026-10-26</td><td>标题确认</td><td>标题+正文</td><td>-</td></tr><tr><td>关于省科技创新计划项目重大事项变更的公示</td><td>湖南省科学技术厅</td><td>湖南省</td><td>公示公开</td><td>2026-10-26</td><td>标题确认</td><td>标题</td><td>-</td></tr><tr><td>武清区人民政府办公室关于印发武清区2026年食品安全监督管理计划的通知</td><td>武清区人民政府办公室</td><td>天津、天津市、武清区</td><td>其他政策</td><td>2026-10-26</td><td>正文线索</td><td>正文</td><td>-</td></tr><tr><td>关于开展2026年度咸宁市新型研发机构备案的通知</td><td>咸宁市科学技术局</td><td>湖北省、咸宁市</td><td>其他政策</td><td>2026-10-26</td><td>正文线索</td><td>正文</td><td>-</td></tr><tr><td>转发江门市科学技术局关于组织开展国家重点研发计划“粤港澳大湾区国际科技创新中心”重点专项专家推荐征集工作的通知</td><td>开平市科工商务局</td><td>广东省、江门市、开平市</td><td>申报指南</td><td>2026-10-26</td><td>标题确认</td><td>标题+正文</td><td>-</td></tr><tr><td>《中方县国民经济和社会发展第十五个五年规划纲要》政策解读</td><td>中方县人民政府</td><td>湖南省、怀化市、中方县</td><td>其他政策</td><td>2026-10-26</td><td>正文线索</td><td>正文</td><td>-</td></tr></tbody></table></div></section>
     <section class="report-page biz-section"><div class="report-topbar"><div class="report-stripe"></div><div class="report-banner">政策大数据报告</div></div><div class="biz-section-head"><div><h2>代表性记录</h2><p class="biz-section-note">关键明细记录 Top N。</p></div><span class="biz-tag">Records</span></div><div class="table-wrap"><table><thead><tr><th>政策标题</th><th>发布机构</th><th>政策类型</th><th>发布日期</th><th>相关性</th><th>重复标记</th></tr></thead><tbody><tr><td>深圳市科技创新局关于发布《2026年深圳鲲鹏青年创业项目申请指南》的通知</td><td>罗湖区企业服务中心</td><td>其他政策</td><td>2026-10-26</td><td>标题确认</td><td>-</td></tr><tr><td>深圳市科技创新局关于组织开展大型科研仪器实验人员技术课程的通知</td><td>深圳市科技创新委员会</td><td>申报指南</td><td>2026-10-26</td><td>标题确认</td><td>-</td></tr><tr><td>深圳市科技创新局关于组织开展大型科研仪器实验人员技术课程的通知</td><td>深圳市科技创新委员会</td><td>申报指南</td><td>2026-10-26</td><td>标题确认</td><td>重复样本</td></tr><tr><td>新郑市2026年11月份领导接访公告</td><td>郑州市新郑市市场监督管理局</td><td>其他政策</td><td>2026-10-26</td><td>正文线索</td><td>-</td></tr><tr><td>深圳市科技创新局关于转发“脑科学与类脑研究”国家科技重大专项、“中韩青年科学家交流计划”等2个项目申报指南的通知</td><td>罗湖区企业服务中心</td><td>申报指南</td><td>2026-10-26</td><td>标题确认</td><td>-</td></tr><tr><td>关于省科技创新计划项目重大事项变更的公示</td><td>湖南省科学技术厅</td><td>公示公开</td><td>2026-10-26</td><td>标题确认</td><td>-</td></tr><tr><td>武清区人民政府办公室关于印发武清区2026年食品安全监督管理计划的通知</td><td>武清区人民政府办公室</td><td>其他政策</td><td>2026-10-26</td><td>正文线索</td><td>-</td></tr><tr><td>关于开展2026年度咸宁市新型研发机构备案的通知</td><td>咸宁市科学技术局</td><td>其他政策</td><td>2026-10-26</td><td>正文线索</td><td>-</td></tr><tr><td>转发江门市科学技术局关于组织开展国家重点研发计划“粤港澳大湾区国际科技创新中心”重点专项专家推荐征集工作的通知</td><td>开平市科工商务局</td><td>申报指南</td><td>2026-10-26</td><td>标题确认</td><td>-</td></tr><tr><td>《中方县国民经济和社会发展第十五个五年规划纲要》政策解读</td><td>中方县人民政府</td><td>其他政策</td><td>2026-10-26</td><td>正文线索</td><td>-</td></tr></tbody></table></div></section>
     <section class="report-page biz-section"><div class="report-topbar"><div class="report-stripe"></div><div class="report-banner">政策大数据报告</div></div><div class="biz-section-head"><div><h2>特征与洞察</h2><p class="biz-section-note">基于数据的结构化解读。</p></div><span class="biz-tag">Insights</span></div><div class="structural-feature-grid"><article class="structural-feature-card">
