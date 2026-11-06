@@ -16,6 +16,7 @@ This file never prints secrets; MCP credentials live in the server's own .env.
 from __future__ import annotations
 
 import argparse
+import copy
 import datetime as dt
 import json
 import pathlib
@@ -269,31 +270,41 @@ def _enrich_metrics_with_profile(metrics: List[Dict[str, Any]], record: Any) -> 
         metrics.append({"label": "法定代表人", "value": _prof["legal_rep"], "hint": "工商登记法定代表人"})
     return metrics
 
-def _derive_core_metrics(metrics: List[Dict[str, Any]], core: Mapping[str, Any]) -> List[Dict[str, Any]]:
-    """Derive additional metrics from core analysis sections."""
+SAMPLE_METRIC_LABELS = {"高频主题词", "最热主题", "覆盖月份", "发布机构数", "政策类型数"}
+
+
+def _derive_core_metrics(metrics: List[Dict[str, Any]], core: Mapping[str, Any], subject: Optional[Mapping[str, Any]] = None) -> List[Dict[str, Any]]:
+    """Derive policy metrics with explicit sample scope.
+
+    "发布机构数" is computed from the retained page, so it is labeled as a
+    sample count. Body keyword counts are mechanical occurrences, not themes.
+    "政策类型数" is omitted when the query already filters by policy type,
+    because the distribution is then fixed by the filter.
+    """
     type_dist = core.get("type_dist", []) if isinstance(core, dict) else []
     keyword_freq = core.get("keyword_freq", []) if isinstance(core, dict) else []
     monthly = core.get("monthly_trend", []) if isinstance(core, dict) else []
     search = core.get("search_records", []) if isinstance(core, dict) else []
-    if isinstance(type_dist, list) and type_dist:
-        metrics.append({"label": "政策类型数", "value": str(len(type_dist)), "hint": "涉及的政策类型数"})
+    pn_type = str((subject or {}).get("pn_type") or "全部")
+    if isinstance(type_dist, list) and len(type_dist) >= 2 and pn_type in ("", "全部"):
+        metrics.append({"label": "政策类型数", "value": str(len(type_dist)), "hint": "本页归纳样本涉及的政策类型数（非全量）"})
     if isinstance(keyword_freq, list) and keyword_freq:
-        metrics.append({"label": "高频主题词", "value": str(len(keyword_freq)), "hint": "出现频次较高的主题词数"})
+        metrics.append({"label": "有命中主题词数", "value": str(len(keyword_freq)), "hint": "固定词表中出现过的词数，不代表主题数"})
         try:
             top_kw = max(keyword_freq, key=lambda r: int(r.get("出现次数", "0")) if str(r.get("出现次数", "0")).isdigit() else 0)
             if top_kw.get("主题词"):
-                metrics.append({"label": "最热主题", "value": str(top_kw["主题词"]), "hint": "出现频次最高的主题词"})
+                metrics.append({"label": "高频词", "value": str(top_kw["主题词"]), "hint": "固定词表中出现次数最多的词（机械计数，非语义主题）"})
         except (ValueError, TypeError):
             pass
     if isinstance(monthly, list) and monthly:
-        metrics.append({"label": "覆盖月份", "value": str(len(monthly)), "hint": "有政策发布的月份数"})
+        metrics.append({"label": "有政策月份数", "value": str(len(monthly)), "hint": "归纳样本中有政策发布的月份数"})
     if isinstance(search, list) and search:
         agencies = set(
             str(r.get("发布机构", "")) for r in search
             if r.get("发布机构") and r.get("相关性") == "标题确认" and r.get("重复标记") != "重复样本"
         )
         if agencies:
-            metrics.append({"label": "发布机构数", "value": str(len(agencies)), "hint": "涉及的政策发布机构数"})
+            metrics.append({"label": "样本内发布机构数", "value": str(len(agencies)), "hint": "本页标题确认且去重样本涉及的发布机构数（非全量）"})
     return metrics
 
 
@@ -374,16 +385,20 @@ def build_metrics(approved: Mapping[str, Any], search_total: Any) -> List[Dict[s
             m4: Dict[str, Any] = {"label": "区级项目", "value": _text(level.get("districtProjectCount")) or "-", "hint": "获批区级项目数量"}
             m4.update(_share_delta(level.get("districtProjectCount")))
             metrics.append(m4)
-    metrics.append({"label": "政策检索结果", "value": (_text(search_total) if search_total is not None else "-"), "hint": "本次政策检索命中条数"})
+    total_text = _text(search_total) if search_total is not None else "-"
+    total_hint = "本次政策检索命中条数"
+    if total_text.replace(",", "") in ("10000", "10000.0"):
+        total_hint += "；上游返回 10000，可能为结果上限，按部分结果处理"
+    metrics.append({"label": "政策检索结果", "value": total_text, "hint": total_hint})
     return [m for m in metrics if m.get("value") not in ("", None, "-")]
 
 
 def build_caliber(subject: Mapping[str, Any]) -> Dict[str, Any]:
-    parts = ["政策检索按政策关键词匹配", f"（pnType={subject.get('pn_type', '全部')}）"]
+    parts = ["政策检索按政策关键词匹配", f"（政策类型={subject.get('pn_type', '全部')}）"]
     if subject.get("enterprise"):
         parts.append(f"；立项项目统计按企业主体“{subject.get('enterprise')}”匹配")
     products = [item["name"] for item in _requested_product_rows(subject)]
-    limit = "数据来自政策公开数据库；少量字段可能存在更新延迟。"
+    limit = "数据来自政策公开数据库；少量字段可能存在更新延迟。检索总数可能受上游上限影响（例如返回 10000 条时按部分结果处理）；政策发布/申报指南不等同于企业符合条件或已获资助。"
     if subject.get("enterprise_blocked_reason"):
         limit += f" 企业主体未唯一解析（{subject.get('enterprise_blocked_reason')}），未执行企业立项统计；政策关键词检索仍为独立范围。"
     return {
@@ -410,6 +425,7 @@ def _requested_product_rows(subject: Mapping[str, Any]) -> List[Dict[str, str]]:
 
 def build_core_analysis(approved: Any, search: Any, policy_info: Any, subject: Mapping[str, Any]) -> Dict[str, Any]:
     a = approved if isinstance(approved, dict) else {}
+    pn_type = _text(subject.get("pn_type") or "全部")
 
     # 立项项目统计 KV + 表
     approved_kv: Dict[str, Any] = {}
@@ -538,12 +554,17 @@ def build_core_analysis(approved: Any, search: Any, policy_info: Any, subject: M
         {"key": "agency_stat", "title": "项目归口分布", "kind": "bar", "note": "按主管机构统计获批项目数量", "chart": {"name": "主管机构", "value": "项目数量", "orient": "v"}, "columns": [("主管机构", "主管机构"), ("项目数量", "项目数量")]},
         {"key": "year_project_stat", "title": "获批项目趋势", "kind": "line", "note": "按年度统计获批项目数量", "chart": {"x": "年份", "y": "获批项目数", "area": True}, "columns": [("年份", "年份"), ("获批项目数", "获批项目数")]},
         {"key": "type_dist", "title": "政策类型分布", "kind": "pie", "note": "仅按标题确认且去重的归纳样本统计政策类型", "chart": {"name": "政策类型", "value": "数量", "donut": True}, "columns": [("政策类型", "政策类型"), ("数量", "数量")]},
-        {"key": "keyword_freq", "title": "政策主题词频", "kind": "bar", "note": "仅对标题确认且去重样本的正文(pnText)做子主题词统计", "chart": {"name": "主题词", "value": "出现次数", "orient": "v"}, "columns": [("主题词", "主题词"), ("出现次数", "出现次数")]},
+        {"key": "keyword_freq", "title": "政策文本高频词", "kind": "bar", "note": "仅对标题确认且去重样本的正文做固定词表机械计数；同义词未合并，不能等同于政策主题", "chart": {"name": "主题词", "value": "出现次数", "orient": "v"}, "columns": [("主题词", "主题词"), ("出现次数", "出现次数")]},
         {"key": "monthly_trend", "title": "政策发布时间趋势", "kind": "line", "note": "仅按标题确认且去重样本的发布月份统计", "chart": {"x": "月份", "y": "政策数量", "area": True}, "columns": [("月份", "月份"), ("政策数量", "政策数量")]},
         {"key": "relevance_summary", "title": "检索相关性校验", "kind": "kv", "note": "保留上游 total；主题聚合仅使用标题确认且按标题+机构+日期去重的归纳样本，正文命中仅作线索"},
         {"key": "search_records", "title": "政策检索明细", "kind": "table", "note": f"上游命中 {total if total is not None else '未知'} 条；本次归纳 {len(search_rows)} 条，标题确认相关去重样本 {len(title_confirmed_unique_items)} 条",
          "columns": [("政策标题", "政策标题"), ("发布机构", "发布机构"), ("地区", "地区"), ("政策类型", "政策类型"), ("发布日期", "发布日期"), ("相关性", "相关性"), ("命中位置", "命中位置"), ("重复标记", "重复标记")]},
     ]
+    # A type distribution under an explicit type filter is tautological
+    # ("公示公开 100%" when the query already selected 公示公开).
+    if pn_type not in ("", "全部") or len(type_dist_rows) < 2:
+        type_dist_rows = []
+        sections = [s for s in sections if s.get("key") != "type_dist"]
     if info_kv:
         sections.append({"key": "policy_info", "title": "政策详情", "kind": "kv", "note": f"按政策 id 查询：{subject.get('policy_id')}"})
 
@@ -597,32 +618,88 @@ def _concentration_rows(rows: List[Mapping[str, Any]], name_key: str, value_key:
     return {"top": items[0][0], "top_share": items[0][1] / total * 100, "cr": cr, "total": total, "count": len(items)}
 
 
-def _year_trend_analysis(rows: List[Mapping[str, Any]]) -> Dict[str, Any]:
-    """Direction/peak/YoY for 获批项目数 year series."""
-    nums = []
+def _row_year(value: Any) -> Optional[int]:
+    text = _text(value)
+    return int(text[:4]) if len(text) >= 4 and text[:4].isdigit() else None
+
+
+def _year_trend_analysis(rows: List[Mapping[str, Any]], as_of_year: Optional[int] = None) -> Dict[str, Any]:
+    """Direction/peak for the approved-project year series.
+
+    Always drops the current partial year, even when fewer than two complete
+    years remain (then returns an ``insufficient_years`` result instead of a
+    YoY comparison). Skips direction when the latest two complete years have
+    fewer than 10 approvals; always reports the latest year so a stale series
+    (e.g. ending in 2023) is not described as "近年".
+    """
+    points: List[tuple[Any, float]] = []
     for r in rows:
         try:
-            nums.append(float(str(r.get("获批项目数", 0)).replace(",", "")))
+            n = float(str(r.get("获批项目数", 0)).replace(",", ""))
         except (TypeError, ValueError):
-            nums.append(0.0)
-    if not nums:
+            n = 0.0
+        points.append((r.get("年份", "-"), n))
+    if not points:
         return {}
-    peak_idx = max(range(len(nums)), key=lambda i: nums[i])
-    direction = "持平"
-    yoy = ""
-    if len(nums) >= 2:
-        last, prev = nums[-1], nums[-2]
-        if prev > 0:
-            pct = (last - prev) / prev * 100
-            if pct > 5:
-                direction = f"上升 {pct:.0f}%"
-            elif pct < -5:
-                direction = f"下降 {abs(pct):.0f}%"
-            yoy = f"同比 {pct:+.0f}%"
-    return {"peak_period": rows[peak_idx].get("年份", "-"), "peak_value": nums[peak_idx], "direction": direction, "yoy": yoy, "last": nums[-1]}
+
+    source_points = list(points)
+    partial_period = None
+    if as_of_year is not None:
+        current = [(p, n) for p, n in points if _row_year(p) == as_of_year]
+        if current:
+            # The current year is always partial, so exclude it even when that
+            # leaves fewer than two complete years (no YoY against a full year).
+            partial_period = _text(current[-1][0])
+            points = [(p, n) for p, n in points if _row_year(p) != as_of_year]
+    if len(points) < 2:
+        result: Dict[str, Any] = {
+            "insufficient": "完整年度不足 2 期，未作趋势研判",
+            "insufficient_reason": "insufficient_years",
+            "complete_periods": len(points),
+        }
+        if partial_period:
+            result["partial_period"] = partial_period
+        if points:
+            result["last_period"] = _text(points[-1][0])
+            result["last"] = points[-1][1]
+        elif partial_period:
+            # Only the current partial year is visible; keep it as a snapshot.
+            result["last_period"] = _text(source_points[-1][0])
+            result["last"] = source_points[-1][1]
+            result["latest_is_partial"] = True
+        return result
+
+    last_period, last_n = points[-1]
+    prev_period, prev_n = points[-2]
+    result: Dict[str, Any] = {
+        "peak_period": _text(points[max(range(len(points)), key=lambda i: points[i][1])][0]),
+        "peak_value": points[max(range(len(points)), key=lambda i: points[i][1])][1],
+        "last_period": _text(last_period),
+        "last": last_n,
+        "partial_period": partial_period,
+    }
+    if prev_n < 10 or last_n < 10:
+        result["insufficient"] = "最新两个年度任一少于 10 个，按小样本披露规则不输出同比"
+        result["insufficient_reason"] = "small_sample"
+        return result
+    pct = (last_n - prev_n) / prev_n * 100
+    if abs(pct) <= 5:
+        result.update(direction="基本持平", yoy="")
+    else:
+        verb = "上升" if pct > 0 else "下降"
+        result.update(direction=f"{verb} {abs(pct):.0f}%", yoy=f"{_text(last_period)} 年较 {_text(prev_period)} 年{verb} {abs(pct):.0f}%")
+    if as_of_year is not None and _row_year(last_period) is not None and _row_year(last_period) < as_of_year - 1:
+        result["stale"] = f"数据止于 {_text(last_period)}"
+    return result
 
 
-def build_insights(subject: Mapping[str, Any], core: Mapping[str, Any], metrics: Sequence[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+def _row_relevance(row: Mapping[str, Any]) -> Optional[str]:
+    """Stored relevance label, or None when the source never evaluated it."""
+    value = _text((row or {}).get("相关性")).strip()
+    return value if value in ("标题确认", "正文线索", "未命中") else None
+
+
+def build_insights(subject: Mapping[str, Any], core: Mapping[str, Any], metrics: Sequence[Mapping[str, Any]], as_of_year: Optional[int] = None) -> List[Dict[str, Any]]:
     insights: List[Dict[str, Any]] = []
     metric_map = {m["label"]: str(m["value"]) for m in metrics}
     # 1. 项目申报层级（高阶占比）
@@ -660,29 +737,57 @@ def build_insights(subject: Mapping[str, Any], core: Mapping[str, Any], metrics:
     # 3. 获批项目年度趋势
     year_stat = core.get("year_project_stat") or []
     if year_stat:
-        ta = _year_trend_analysis(year_stat)
-        if ta:
+        ta = _year_trend_analysis(year_stat, as_of_year)
+        if ta and not ta.get("insufficient"):
+            latest_label = "最新完整年度" if ta.get("partial_period") else "最新年度"
+            extra = f"；{ta['partial_period']} 年数据不完整，未纳入同比" if ta.get("partial_period") else ""
+            if ta.get("stale"):
+                extra += f"；{ta['stale']}，不代表当前年度"
             insights.append({
                 "feature": "获批项目趋势",
-                "evidence": f"峰值在“{ta['peak_period']}”（{ta['peak_value']:.0f} 个），近年{ta['direction']}，{ta.get('yoy', '')}。",
-                "interpretation": "年度变化仅是已返回项目数量的描述性趋势；没有外部政策、竞争或申报过程证据，不能解释变化原因。",
+                "evidence": f"峰值在“{ta['peak_period']}”（{ta['peak_value']:.0f} 个）；{latest_label} {ta['last_period']} 为 {ta['last']:.0f} 个，{ta.get('yoy') or ta['direction']}{extra}。",
+                "interpretation": "年度变化仅是已返回获批项目数量的描述性趋势；没有外部政策、竞争或申报过程证据，不能解释变化原因，也不能外推未来获批概率。",
+            })
+        elif ta and ta.get("insufficient") and ta.get("last_period"):
+            parts = []
+            latest_label = "最新年度" if ta.get("latest_is_partial") else "最新完整年度"
+            parts.append(f"{latest_label} {ta['last_period']} 为 {ta['last']:.0f} 个")
+            if ta.get("latest_is_partial"):
+                parts.append("该年度数据不完整，不参与同比")
+            elif ta.get("partial_period"):
+                parts.append(f"{ta['partial_period']} 年数据不完整，不参与同比")
+            parts.append(ta["insufficient"])
+            if ta.get("insufficient_reason") == "insufficient_years":
+                interpretation = "完整年度不足 2 期时，本报告仅披露可见年度计数与当前年度快照，不输出同比方向或趋势结论；当前年度数据仍保留在获批项目趋势表中。"
+            else:
+                interpretation = "最新两个完整年度任一少于 10 个时，本报告按小样本处理，仅披露原始计数，不以同比方向作结论；该阈值为报告披露规则，不代表统计显著性。"
+            insights.append({
+                "feature": "获批项目趋势数据不足",
+                "evidence": "；".join(parts) + "。",
+                "interpretation": interpretation,
             })
 
     # 4. 政策类型集中度（基于检索结果聚合）
     type_dist = core.get("type_dist") or []
-    if type_dist:
+    pn_type = _text(subject.get("pn_type") or "全部")
+    if type_dist and len(type_dist) >= 2 and pn_type in ("", "全部"):
         conc = _concentration_rows(type_dist, "政策类型", "数量", 3)
         if conc:
             insights.append({
                 "feature": "政策类型结构",
-                "evidence": f"检索政策中“{conc['top']}”类占比约 {conc['top_share']:.0f}%，前 3 类合计 {conc['cr']:.0f}%（CR3）。",
-                "interpretation": "该比例仅描述归纳样本中标题确认且去重样本的类型构成，不代表可申报机会数量、实施成效或竞争强度。",
+                "evidence": f"归纳样本中“{conc['top']}”类占比约 {conc['top_share']:.0f}%，前 3 类合计 {conc['cr']:.0f}%（CR3）。",
+                "interpretation": "该比例仅描述本页标题确认且去重样本的类型构成，不代表可申报机会数量、实施成效或竞争强度；已按类型筛选时该分布不具区分度。",
             })
 
     # 5. 政策匹配广度 + 地区覆盖
     search_total = metric_map.get("政策检索结果")
     search_rows = core.get("search_records") or []
-    relevant_rows = [r for r in search_rows if r.get("相关性") == "标题确认" and r.get("重复标记") != "重复样本"]
+    evaluated_rows = [r for r in search_rows if _row_relevance(r) is not None]
+    unverified_rows = [r for r in search_rows if _row_relevance(r) is None]
+    relevant_rows = [
+        r for r in evaluated_rows
+        if _row_relevance(r) == "标题确认" and r.get("重复标记") != "重复样本"
+    ]
     if search_total and search_rows:
         regions = set()
         for r in relevant_rows:
@@ -694,10 +799,20 @@ def build_insights(subject: Mapping[str, Any], core: Mapping[str, Any], metrics:
                     if part:
                         regions.add(part)
         region_clause = f"，覆盖地区 {len(regions)} 个" if regions else ""
+        cap_clause = "（可能为上游结果上限）" if str(search_total).replace(",", "") in ("10000", "10000.0") else ""
+        if unverified_rows and not evaluated_rows:
+            evidence = f"上游命中 {search_total} 条{cap_clause}；本页列示 {len(search_rows)} 条记录，但来源未包含本地相关性校验结果，标题确认样本数与地区覆盖无法核实（相关性未评估，保持未知）。"
+            interpretation = "来源记录未提供相关性校验结果，无法区分标题确认与正文线索；报告未重新执行语义匹配，缺失评估保持未知，不推断为零值；上游总数未经本地相关性过滤，也可能受接口上限影响，不外推政策适用范围、申报资格或补贴金额。"
+        elif unverified_rows:
+            evidence = f"上游命中 {search_total} 条{cap_clause}；本页经校验的标题确认且去重样本 {len(relevant_rows)} 条{region_clause}；另有 {len(unverified_rows)} 条未包含相关性校验结果，未计入确认或否定样本。"
+            interpretation = "来源记录中部分样本未提供相关性校验结果，无法判定其相关性，未按零值或未命中处理；上游总数未经本地相关性过滤，也可能受接口上限影响；正文命中仅作为待复核线索，只能基于已校验的标题确认样本做描述，不外推政策适用范围、申报资格或补贴金额。"
+        else:
+            evidence = f"上游命中 {search_total} 条{cap_clause}；本页经校验的标题确认且去重样本 {len(relevant_rows)} 条{region_clause}。"
+            interpretation = "上游总数未经本地相关性过滤，也可能受接口上限影响；正文命中仅作为待复核线索，只能基于标题确认样本做描述，不外推政策适用范围、申报资格或补贴金额。"
         insights.append({
             "feature": "政策匹配广度",
-            "evidence": f"上游返回 total={search_total}；归纳样本中标题确认且去重的样本 {len(relevant_rows)} 条{region_clause}。",
-            "interpretation": "上游 total 未经本地相关性过滤；正文命中仅作为待复核线索，只能基于归纳样本中标题确认样本做描述，不外推政策适用范围或价值。",
+            "evidence": evidence,
+            "interpretation": interpretation,
         })
 
     if not insights:
@@ -741,37 +856,55 @@ def build_dry_run_payload(keyword: str, filters: Mapping[str, Any]) -> Dict[str,
     subject = {**subject, "keyword": keyword, **{k: v for k, v in filters.items() if v}}
     core = sample.get("core_analysis") or {}
     metrics = sample.get("metrics") or []
-    return _assemble(subject, core, metrics, dry_run=True)
+    return apply_content_review(_assemble(subject, core, metrics, dry_run=True))
 
 
 # --------------------------------------------------------------------------- #
 # Assembly
 # --------------------------------------------------------------------------- #
 
+def _generated_year(value: Any) -> Optional[int]:
+    text = _text(value)
+    return int(text[:4]) if len(text) >= 4 and text[:4].isdigit() else None
+
+
+def _content_quality_report(core: Mapping[str, Any]) -> Dict[str, Any]:
+    """Section-fill rate from final declared sections and actual bodies.
+
+    0 is populated; only None/""/[]/{} count as empty. Not an accuracy score.
+    """
+    ca = core if isinstance(core, dict) else {}
+    sections = [s for s in (ca.get("sections") or []) if isinstance(s, dict) and s.get("key")]
+
+    def filled(value: Any) -> bool:
+        return value is not None and value != "" and value != [] and value != {}
+
+    if sections:
+        total = len(sections)
+        populated = sum(1 for spec in sections if filled(ca.get(spec["key"])))
+    else:
+        keys = [k for k in ca if k != "sections"]
+        total = max(1, len(keys))
+        populated = sum(1 for key in keys if filled(ca.get(key)))
+    return {
+        "total_sections": total,
+        "populated_sections": populated,
+        "empty_sections": total - populated,
+        "coverage_pct": round(populated / max(1, total) * 100),
+    }
+
+
 def _assemble(subject: Mapping[str, Any], core: Mapping[str, Any], metrics: Sequence[Mapping[str, Any]], *, dry_run: bool) -> Dict[str, Any]:
     abstract = build_abstract(subject, core, metrics)
     records = build_records(core)
-    insights = build_insights(subject, core, metrics)
-    # Quality gate: count populated core-analysis sections.
-    ca = core if isinstance(core, dict) else {}
-    secs = ca.get("sections", [])
-    if secs:
-        total_secs = len(secs)
-        populated = sum(1 for s in secs if isinstance(s, dict) and ca.get(s.get("key")) not in (None, "", [], {}))
-    else:
-        total_secs = max(1, len([k for k in ca if k != "sections"]))
-        populated = sum(1 for k in ca if k != "sections" and ca.get(k) not in (None, "", [], {}))
-    quality_report = {
-        "total_sections": total_secs,
-        "populated_sections": populated,
-        "empty_sections": total_secs - populated,
-        "coverage_pct": round(populated / max(1, total_secs) * 100),
-    }
-    if populated == 0:
+    generated_at = dt.datetime.now().astimezone().isoformat(timespec="seconds")
+    insights = build_insights(subject, core, metrics, _generated_year(generated_at))
+    quality_report = _content_quality_report(core)
+    if quality_report["populated_sections"] == 0:
         import sys
         print("⚠️ 质量门禁警告: 所有核心分析维度均无数据", file=sys.stderr)
     title = f"“{subject.get('keyword') or '目标关键词'}” 政策大数据报告"
-    return {
+    report = {
         "report_type": REPORT_TYPE,
         "title": title,
         "banner": REPORT_BANNER,
@@ -787,13 +920,71 @@ def _assemble(subject: Mapping[str, Any], core: Mapping[str, Any], metrics: Sequ
         "data_source": {
             "mcp_server": "policy-mcp-server",
             "products": _requested_product_rows(subject),
-            "generated_at": dt.datetime.now().astimezone().isoformat(timespec="seconds"),
+            "generated_at": generated_at,
             "dry_run": dry_run,
             "source_status": core.get("source_status", {}),
             "blocked_reason": subject.get("enterprise_blocked_reason") or None,
             "quality_report": quality_report,
         },
     }
+    return report
+
+
+def _policy_derived_labels() -> set:
+    return set(SAMPLE_METRIC_LABELS) | {"有命中主题词数", "高频词", "有政策月份数", "样本内发布机构数"}
+
+
+def apply_content_review(report: Mapping[str, Any]) -> Dict[str, Any]:
+    """Rebuild policy narrative content from an existing payload.
+
+    Pure/in-memory. Removes the tautological type distribution when the query is
+    already type-filtered, normalizes sample-scope metric labels, removes raw
+    field names from section notes, rebuilds the approved-project trend with
+    partial-year / low-volume / staleness guards, and refreshes
+    abstract/executive_summary/caliber.
+    """
+    out = copy.deepcopy(dict(report))
+    core = out.setdefault("core_analysis", {})
+    subject = out.get("subject") or {}
+    pn_type = _text(subject.get("pn_type") or "全部")
+    if pn_type not in ("", "全部") or len(core.get("type_dist") or []) < 2:
+        core["type_dist"] = []
+        core["sections"] = [s for s in (core.get("sections") or []) if not (isinstance(s, dict) and s.get("key") == "type_dist")]
+
+    for spec in core.get("sections") or []:
+        if not isinstance(spec, dict):
+            continue
+        key = spec.get("key")
+        note = str(spec.get("note") or "")
+        if key == "keyword_freq":
+            spec["title"] = "政策文本高频词"
+            spec["note"] = "仅对标题确认且去重样本的正文做固定词表机械计数；同义词未合并，不能等同于政策主题"
+        elif key == "relevance_summary":
+            spec["note"] = note.replace("上游 total", "上游总数")
+        elif key == "search_records" and "10000" in note and "上限" not in note:
+            spec["note"] = note + "；上游返回 10000，可能为结果上限"
+
+    metrics: List[Dict[str, Any]] = []
+    for metric in out.get("metrics") or []:
+        if not isinstance(metric, dict) or metric.get("label") in _policy_derived_labels():
+            continue
+        item = dict(metric)
+        if item.get("label") == "政策检索结果" and str(item.get("value", "")).replace(",", "") in ("10000", "10000.0"):
+            item["hint"] = "本次政策检索命中条数；上游返回 10000，可能为结果上限，按部分结果处理"
+        metrics.append(item)
+    _derive_core_metrics(metrics, core, subject)
+    out["metrics"] = metrics
+
+    source = out.get("data_source") or {}
+    insights = build_insights(subject, core, metrics, _generated_year(source.get("generated_at")))
+    out["insights"] = insights
+    abstract = build_abstract(subject, core, metrics)
+    out["abstract"] = abstract
+    out["summary"] = abstract
+    out["executive_summary"] = [item["interpretation"] for item in insights][:5] or [abstract[:120]]
+    out["caliber"] = build_caliber(subject)
+    out.setdefault("data_source", {})["quality_report"] = _content_quality_report(core)
+    return out
 
 
 @paid_call_scope
@@ -838,8 +1029,8 @@ def build_payload(keyword: str, filters: Mapping[str, Any], page_size: int, max_
     metrics = build_metrics(approved if isinstance(approved, dict) else {}, search_total)
     # --- Enterprise profile enrichment (from fuzzy_search) ---
     _enrich_metrics_with_profile(metrics, enterprise_resolved.get("record") if isinstance(enterprise_resolved, dict) else None)
-    _derive_core_metrics(metrics, core if isinstance(core, dict) else {})
-    report = _assemble(subject, core, metrics, dry_run=False)
+    _derive_core_metrics(metrics, core if isinstance(core, dict) else {}, subject)
+    report = apply_content_review(_assemble(subject, core, metrics, dry_run=False))
     return attach_pagination(report, {"政策检索": search})
 
 
